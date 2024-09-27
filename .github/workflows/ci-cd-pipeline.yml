@@ -1,0 +1,63 @@
+name: CI/CD Pipeline for Chatbot
+
+# Trigger the workflow on push to the main branch
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Set up Azure CLI
+      - name: Set up Azure CLI
+        uses: azure/CLI@v1
+
+      # Log in to Azure using a service principal (you will need secrets for this)
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Store your Azure credentials in GitHub Secrets
+
+      # Log in to Azure Container Registry (ACR)
+      - name: Log in to ACR
+        run: az acr login --name softskillsregistry
+
+      # Build the Docker image
+      - name: Build Docker image
+        run: docker build -t softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }} .
+
+      # Push the Docker image to ACR
+      - name: Push Docker image to ACR
+        run: docker push softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      # Set up Azure CLI
+      - name: Set up Azure CLI
+        uses: azure/CLI@v1
+
+      # Log in to Azure using a service principal
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Use the same credentials as before
+
+      # Get AKS credentials
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials --resource-group soft-skills-coach-rg --name chatbot_cluster
+
+      # Update Kubernetes deployment with the new image
+      - name: Deploy to AKS
+        run: |
+          kubectl set image deployment/chatbot-deployment chatbot-container=softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }}
