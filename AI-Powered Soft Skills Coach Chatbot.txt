@@ -1,0 +1,71 @@
+AI-Powered Soft Skills Coach Chatbot
+Objective: Develop a functional AI chatbot coach for soft skills, demonstrating proficiency in core
+ML engineering skills.
+Core Requirements:
+1. RAG System Implementation:
+○ Implement a basic Retrieval-Augmented Generation system
+○ Integrate a vector database of your choice
+○ Store and retrieve past conversations (limited to the current session)
+2. Slack Integration:
+○ Integrate the chatbot with Slack using Slack's API
+○ Provide instructions for adding the bot to a Slack workspace for testing
+3. Monitoring:
+○ Implement basic logging and monitoring (Langfuse or alternative)
+4. Voice Interaction:
+○ Implement both speech-to-text for user input OR text-to-speech for bot
+responses
+5. Deployment:
+○ Deploy the solution to a Azure
+6. Comprehensive Documentation:
+○ Provide a detailed technical document (in Markdown format) explaining:
+■ System architecture and design decisions
+■ RAG implementation details
+■ Vector database setup and usage
+■ Slack integration process
+■ Deployment procedure
+■ Known limitations and potential improvements
+○ Provide a README file
+7. OPTIONAL: →Video Presentation:
+○ Create a 2-minute video explaining the bot's key features and implementation
+approach and briefly demonstrating it. Include clear instructions on accessing
+and interacting with the live chatbot demo.
+Detailed Steps for Key Components:
+1. Vector Database Integration:
+a. Choose and set up a vector database
+b. Implement basic functions for storing and querying embeddings
+c. Integrate the database with the RAG pipeline
+2. Voice Interaction Implementation (Choose One):
+a. Integrate a basic speech-to-text module for user input OR
+b. Implement a simple text-to-speech system for bot responses
+3. Conversational AI for Soft Skills Coaching:
+a. Design basic conversation flows for soft skills coaching
+b. Implement a simple context-awareness mechanism for coherent conversations
+c. Develop a module to provide basic coaching advice
+4. Deployment and Monitoring:
+a. Deploy the chatbot to a cloud platform
+b. Set up basic logging and monitoring
+Evaluation Criteria:
+● Code quality and organization
+● Effectiveness of the RAG system and relevance of responses
+● Implementation of either speech-to-text or text-to-speech
+● System functionality and basic performance
+● Clarity of documentation
+● Overall user experience and basic coaching capability
+Optional Stretch Goals (if time permits):
+1. Implement the HyDE (Hypothetical Document Embeddings) technique
+2. Add basic time profiling for major system components
+3. Implement both speech-to-text and text-to-speech
+4. Add multi-turn conversation handling
+5. Incorporate basic sentiment analysis into the chatbot's responses
+6. Develop a basic user feedback mechanism
+Submission Guidelines
+● Provide a GitHub repository with your solution.
+● Include a README.md with setup instructions and an overview of your approach.
+● Submit at most within one week after of receiving the test.
+● Attach the document in markdown format.
+Notes
+● You may use open-source libraries and pre-trained models, but document any external
+resources, including the prompts used in LLMs.
+● Prioritize getting a functional system up and running with core features.
+● The live demo link is a critical component of your submission. Ensure it's stable
+and accessible on Slack
