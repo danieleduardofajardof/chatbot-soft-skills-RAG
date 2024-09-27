@@ -1,13 +1,12 @@
-name: CI/CD Pipeline for Chatbot
+name: CI/CD Pipeline for ARM Architecture on AKS
 
-# Trigger the workflow on push to the main branch
 on:
   push:
     branches:
       - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,49 +14,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Set up Azure CLI
-      - name: Set up Azure CLI
-        uses: azure/CLI@v1
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      # Log in to Azure using a service principal (you will need secrets for this)
-      - name: Azure Login
+      # Log in to Azure using the service principal stored in GitHub Secrets
+      - name: Log in to Azure
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Store your Azure credentials in GitHub Secrets
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # Log in to Azure Container Registry (ACR)
       - name: Log in to ACR
-        run: az acr login --name softskillsregistry
+        run: |
+          az acr login --name softskillsregistry
 
-      # Build the Docker image
-      - name: Build Docker image
-        run: docker build -t softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }} .
-
-      # Push the Docker image to ACR
-      - name: Push Docker image to ACR
-        run: docker push softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      # Set up Azure CLI
-      - name: Set up Azure CLI
-        uses: azure/CLI@v1
-
-      # Log in to Azure using a service principal
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}  # Use the same credentials as before
+      # Build and push the Docker image for ARM architecture
+      - name: Build and Push Docker Image (ARM)
+        run: |
+          docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }} --push .
 
       # Get AKS credentials
       - name: Get AKS credentials
         run: |
           az aks get-credentials --resource-group soft-skills-coach-rg --name chatbot_cluster
 
-      # Update Kubernetes deployment with the new image
+      # Update Kubernetes deployment with the new ARM image
       - name: Deploy to AKS
         run: |
           kubectl set image deployment/chatbot-deployment chatbot-container=softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }}
