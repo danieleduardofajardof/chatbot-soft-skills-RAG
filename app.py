@@ -54,7 +54,7 @@ slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 def generate_response(user_input):
     try:
         response = openai_client.chat.completions.create(
-            model="voice-text",  # Ensure this matches the deployment name in Azure
+            model="gpt-4-2",  # Ensure this matches the deployment name in Azure
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input}
