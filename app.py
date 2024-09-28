@@ -9,6 +9,18 @@ from datetime import datetime
 from fastapi.responses import JSONResponse
 import azure.cognitiveservices.speech as speechsdk
 from openai import AzureOpenAI
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info(f"AZURE_OPENAI_API_KEY: {os.getenv('AZURE_OPENAI_API_KEY')}")
+logger.info(f"AZURE_OPENAI_ENDPOINT: {os.getenv('AZURE_OPENAI_ENDPOINT')}")
+
+# Initialize the OpenAI client
+openai_client = AzureOpenAI(
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_version="2023-03-15-preview"
+)
 
 # Initialize Azure OpenAI client
 openai_client = AzureOpenAI(api_key=os.getenv("AZURE_OPENAI_API_KEY"),
