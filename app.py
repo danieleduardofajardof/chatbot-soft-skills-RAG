@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.addHandler(CosmosDBHandler())  # Add custom handler to store logs in CosmosDB
 
-# Log environment variables for debugging (only log that they exist, no values)
+# Log environment variables for debugging (only log existence)
 logger.info(f"AZURE_OPENAI_API_KEY exists: {bool(os.getenv('AZURE_OPENAI_API_KEY'))}")
 logger.info(f"AZURE_OPENAI_ENDPOINT exists: {bool(os.getenv('AZURE_OPENAI_ENDPOINT'))}")
 
@@ -53,24 +53,33 @@ slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
 # Azure Speech to Text
 def speech_to_text(file_path):
-    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
-    audio_config = speechsdk.audio.AudioConfig(filename=file_path)
-    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-    
-    result = recognizer.recognize_once()
-    if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-        return result.text
-    else:
+    try:
+        speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+        audio_config = speechsdk.audio.AudioConfig(filename=file_path)
+        recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+        result = recognizer.recognize_once()
+        
+        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+            logger.info(f"Recognized speech: {result.text}")
+            return result.text
+        else:
+            logger.error(f"Speech recognition failed with reason: {result.reason}")
+            return None
+    except Exception as e:
+        logger.error(f"Error during speech recognition: {e}")
         return None
 
 # Azure Text to Speech
 def text_to_speech(response_text):
-    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
-    audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
-
-    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
-    synthesizer.speak_text_async(response_text).get()
-    return "response_audio.wav"
+    try:
+        speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+        audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
+        synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+        synthesizer.speak_text_async(response_text).get()
+        return "response_audio.wav"
+    except Exception as e:
+        logger.error(f"Error during text-to-speech conversion: {e}")
+        return None
 
 # Process audio files and convert to text
 def process_audio_file(file_url, token):
@@ -78,12 +87,16 @@ def process_audio_file(file_url, token):
         "Authorization": f"Bearer {token}"
     }
     response = requests.get(file_url, headers=headers)
+    
+    if response.status_code != 200:
+        logger.error(f"Failed to download file. Status code: {response.status_code}")
+        return None
+    
     file_path = "received_audio.webm"
-
     with open(file_path, 'wb') as f:
         f.write(response.content)
-
-    # Convert audio to text using Azure Speech-to-Text
+    
+    logger.info(f"Downloaded audio file to {file_path}")
     transcribed_text = speech_to_text(file_path)
     return transcribed_text
 
@@ -101,7 +114,6 @@ def generate_response(user_input):
             stop=None,
             temperature=0.7
         )
-        # Log the API response for debugging
         logger.info(f"OpenAI API Response: {response}")
         bot_response = response.choices[0].message.content.strip()
         return bot_response
@@ -152,7 +164,6 @@ async def slack_events(req: Request):
                 transcribed_text = process_audio_file(file_url, token)
                 if transcribed_text:
                     bot_response = generate_response(transcribed_text)
-                    # Convert bot response to audio
                     audio_file_path = text_to_speech(bot_response)
                     send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
                 else:
@@ -164,7 +175,6 @@ async def slack_events(req: Request):
             user_id = event.get('user', '')
             channel = event.get('channel', '')
 
-            # Get the bot's user ID to prevent it from responding to itself
             auth_response = slack_client.auth_test()
             bot_user_id = auth_response['user_id']
 
