@@ -8,6 +8,7 @@ from pymongo import MongoClient
 from datetime import datetime
 from fastapi.responses import JSONResponse
 import azure.cognitiveservices.speech as speechsdk
+import requests
 from openai import AzureOpenAI
 
 # MongoDB connection for logging
@@ -50,6 +51,42 @@ app = FastAPI()
 # Initialize Slack client with the bot token
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
+# Azure Speech to Text
+def speech_to_text(file_path):
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+    audio_config = speechsdk.audio.AudioConfig(filename=file_path)
+    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+    
+    result = recognizer.recognize_once()
+    if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+        return result.text
+    else:
+        return None
+
+# Azure Text to Speech
+def text_to_speech(response_text):
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+    audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
+
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+    synthesizer.speak_text_async(response_text).get()
+    return "response_audio.wav"
+
+# Process audio files and convert to text
+def process_audio_file(file_url, token):
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = requests.get(file_url, headers=headers)
+    file_path = "received_audio.webm"
+
+    with open(file_path, 'wb') as f:
+        f.write(response.content)
+
+    # Convert audio to text using Azure Speech-to-Text
+    transcribed_text = speech_to_text(file_path)
+    return transcribed_text
+
 # Generate a response using Azure OpenAI's GPT model
 def generate_response(user_input):
     try:
@@ -73,9 +110,12 @@ def generate_response(user_input):
         return "I'm sorry, I'm having trouble generating a response right now."
 
 # Send response back to Slack
-def send_response_to_slack(channel, response):
+def send_response_to_slack(channel, response, file_path=None):
     try:
-        slack_client.chat_postMessage(channel=channel, text=response)
+        if file_path:
+            slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
+        else:
+            slack_client.chat_postMessage(channel=channel, text=response)
     except SlackApiError as e:
         logger.error(f"Error sending message to Slack: {e.response.error}")
     except Exception as e:
@@ -97,42 +137,40 @@ async def slack_events(req: Request):
     data = await req.json()
     logger.info(f"Received event: {data}")
 
-    # Handle URL verification
     if data.get("type") == "url_verification":
         challenge = data.get("challenge")
         return JSONResponse(status_code=200, content={"challenge": challenge})
 
-    # Handle event callbacks
     if 'event' in data:
         event = data['event']
 
-        # Check if the event is a message from a user and not from the bot itself
-        if event.get('type') == 'message' and 'subtype' not in event:
+        # Handle file share events
+        if event.get('subtype') == 'file_share' and event.get('files'):
+            for file in event.get('files'):
+                file_url = file.get('url_private')
+                token = os.getenv("SLACK_BOT_TOKEN")
+                transcribed_text = process_audio_file(file_url, token)
+                if transcribed_text:
+                    bot_response = generate_response(transcribed_text)
+                    # Convert bot response to audio
+                    audio_file_path = text_to_speech(bot_response)
+                    send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
+                else:
+                    send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
+
+        # Handle text message events
+        elif event.get('type') == 'message' and 'subtype' not in event:
             user_input = event.get('text', '').strip()
             user_id = event.get('user', '')
             channel = event.get('channel', '')
-            session_id = event.get('team', '')
 
-            # Optional: Get the bot's user ID to prevent it from responding to itself
-            try:
-                auth_response = slack_client.auth_test()
-                bot_user_id = auth_response['user_id']
-            except SlackApiError as e:
-                logger.error(f"Error fetching bot user ID: {e.response.error}")
-                return JSONResponse(status_code=500, content={"status": "error"})
+            # Get the bot's user ID to prevent it from responding to itself
+            auth_response = slack_client.auth_test()
+            bot_user_id = auth_response['user_id']
 
-            if user_input and user_id and channel:
-                if user_id == bot_user_id:
-                    logger.info("Received a message from the bot itself. Ignoring.")
-                    return JSONResponse(status_code=200, content={"status": "ignored"})
-
-                # Generate the bot's response based on user input
+            if user_input and user_id and channel and user_id != bot_user_id:
                 bot_response = generate_response(user_input)
-
-                # Log and save the conversation
                 log_conversation(user_id, user_input, bot_response)
-
-                # Send response to Slack
                 send_response_to_slack(channel, bot_response)
 
     return JSONResponse(status_code=200, content={"status": "success"})
