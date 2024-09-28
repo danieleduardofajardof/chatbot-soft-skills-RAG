@@ -114,17 +114,23 @@ def generate_response(user_input):
         logger.error(f"Error generating response from Azure OpenAI: {e}")
         return "I'm sorry, I'm having trouble generating a response right now."
 
-# Send response back to Slack
-def send_response_to_slack(channel, response, file_path=None):
+# Send response back to Slack as audio
+def send_response_audio_to_slack(channel, file_path):
     try:
-        if file_path:
-            slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
-        else:
-            slack_client.chat_postMessage(channel=channel, text=response)
+        slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
+    except SlackApiError as e:
+        logger.error(f"Error sending audio to Slack: {e.response.error}")
+    except Exception as e:
+        logger.error(f"Unexpected error sending audio to Slack: {e}")
+
+# Send response back to Slack as text (for text inputs)
+def send_response_to_slack(channel, response):
+    try:
+        slack_client.chat_postMessage(channel=channel, text=response)
     except SlackApiError as e:
         logger.error(f"Error sending message to Slack: {e.response.error}")
     except Exception as e:
-        logger.error(f"Unexpected error sending message: {e}")
+        logger.error(f"Unexpected error sending message to Slack: {e}")
 
 # Log user and bot interactions
 def log_conversation(user_id, user_input, bot_response):
@@ -149,17 +155,19 @@ async def slack_events(req: Request):
     if 'event' in data:
         event = data['event']
 
-        # Handle file share events
+        # Handle file share events (audio)
         if event.get('subtype') == 'file_share' and event.get('files'):
             for file in event.get('files'):
                 file_url = file.get('url_private')
                 token = os.getenv("SLACK_BOT_TOKEN")
                 transcribed_text = process_audio_file(file_url, token)
+                
                 if transcribed_text:
                     bot_response = generate_response(transcribed_text)
                     # Convert bot response to audio
                     audio_file_path = text_to_speech(bot_response)
-                    send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
+                    # Send audio response back to Slack
+                    send_response_audio_to_slack(event.get('channel'), audio_file_path)
                 else:
                     send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
 
