@@ -15,7 +15,6 @@ spec:
       containers:
       - name: soft-skills-chatbot
         image: softskillsregistry.azurecr.io/softskillsbot:latest
-        imagePullPolicy: Always
         ports:
         - containerPort: 80
         env:
@@ -29,3 +28,19 @@ spec:
             secretKeyRef:
               name: softskills-secrets
               key: COSMOS_DB_CONNECTION_STRING
+        - name: AZURE_OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_OPENAI_API_KEY
+        - name: AZURE_OPENAI_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_OPENAI_ENDPOINT
+        - name: AZURE_REGION
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_REGION
+        # Include any other necessary environment variables
