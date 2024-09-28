@@ -273,6 +273,13 @@ jobs:
    ```
    Also set the connection to AKS, by putting the Azure Subscription and other relevant informaton as ACR name
 
+## Step 8: Test CI/CD
+In order to test the CI/CD, you will need to make some change to the code and the push those to the repo
+```bash
+git add.
+git commit -m "Some comments..."
+git push
+```
 ## Implementation Details
 
 The chatbot utilizes a RAG approach, retrieving relevant information from stored conversations to enhance its responses. Key functionalities include:
