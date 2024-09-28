@@ -47,7 +47,7 @@ logs_collection = db['logs']
 def generate_response(user_input):
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-35-turbo",
+            model="voice-text",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input}
