@@ -58,52 +58,45 @@ slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
 # Azure Speech to Text
 def speech_to_text(file_path):
-    try:
-        speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
-        audio_config = speechsdk.audio.AudioConfig(filename=file_path)
-        recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-        
-        result = recognizer.recognize_once()
-        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            return result.text
-        else:
-            logger.error(f"Speech not recognized: {result.reason}")
-            return None
-    except Exception as e:
-        logger.error(f"Error during Speech-to-Text conversion: {e}")
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+    audio_config = speechsdk.audio.AudioConfig(filename=file_path)
+    recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
+    
+    result = recognizer.recognize_once()
+    if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+        return result.text
+    else:
+        logger.error("Speech recognition failed or no speech detected.")
         return None
 
 # Azure Text to Speech
 def text_to_speech(response_text):
-    try:
-        speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
-        audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+    audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
 
-        synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
-        synthesizer.speak_text_async(response_text).get()
-        return "response_audio.wav"
-    except Exception as e:
-        logger.error(f"Error during Text-to-Speech conversion: {e}")
-        return None
+    synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
+    synthesizer.speak_text_async(response_text).get()
+    logger.info(f"Response audio saved as response_audio.wav")
+    return "response_audio.wav"
 
 # Process audio files and convert to text
 def process_audio_file(file_url, token):
-    try:
-        headers = {
-            "Authorization": f"Bearer {token}"
-        }
-        response = requests.get(file_url, headers=headers)
-        file_path = "received_audio.m4a"  # M4A format from the event
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = requests.get(file_url, headers=headers)
+    file_path = "received_audio.m4a"
 
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
+    with open(file_path, 'wb') as f:
+        f.write(response.content)
 
-        # Convert audio to text using Azure Speech-to-Text
-        transcribed_text = speech_to_text(file_path)
-        return transcribed_text
-    except Exception as e:
-        logger.error(f"Error processing audio file: {e}")
-        return None
+    # Log file processing status
+    logger.info(f"Received and saved audio file to {file_path}")
+
+    # Convert audio to text using Azure Speech-to-Text
+    transcribed_text = speech_to_text(file_path)
+    logger.info(f"Transcribed text: {transcribed_text}")
+    return transcribed_text
 
 # Generate a response using Azure OpenAI's GPT model
 def generate_response(user_input):
@@ -120,8 +113,8 @@ def generate_response(user_input):
             temperature=0.7
         )
         # Log the API response for debugging
-        logger.info(f"OpenAI API Response: {response}")
         bot_response = response.choices[0].message.content.strip()
+        logger.info(f"Generated bot response: {bot_response}")
         return bot_response
     except Exception as e:
         logger.error(f"Error generating response from Azure OpenAI: {e}")
@@ -131,6 +124,7 @@ def generate_response(user_input):
 def send_response_to_slack(channel, response, file_path=None):
     try:
         if file_path:
+            logger.info(f"Uploading audio response to Slack: {file_path}")
             slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
         else:
             slack_client.chat_postMessage(channel=channel, text=response)
@@ -172,6 +166,7 @@ async def slack_events(req: Request):
                     bot_response = generate_response(transcribed_text)
                     # Convert bot response to audio
                     audio_file_path = text_to_speech(bot_response)
+                    logger.info(f"Generated audio file path: {audio_file_path}")
                     send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
                 else:
                     send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
