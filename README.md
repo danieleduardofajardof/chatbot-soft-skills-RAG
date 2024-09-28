@@ -203,6 +203,76 @@ kubectl get services
 
 Once you have the external IP, you can interact with your chatbot through Slack.
 
+### Step 7: Set up Slack API
+In the Slack API put the external IP with the relevant FastAPI endpoin, and verify is actually working, set up the option to receive API calls when a message is sent in a relvant channel.
+
+## Step 8: Configure CI/CD
+In order to configure github action a folder needs to be created '.github/workflows' with the 'ci-cd-pipeline.yaml'
+```yaml
+   name: CI/CD Pipeline for AKS
+
+on:
+  push:
+    branches:
+      - main  # Trigger pipeline on push to the main branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code from GitHub
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Set up Docker Buildx for multi-platform builds (optional if needed)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Log in to Azure using service principal credentials stored in GitHub Secrets
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Log in to Azure Container Registry (ACR)
+      - name: Log in to ACR
+        run: |
+          az acr login --name softskillsregistry
+
+      # Build and push the Docker image to ACR, tag it with the commit hash
+      - name: Build and Push Docker Image
+        run: |
+          docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/softskillsbot:${{ github.sha }} --push .
+
+      # Get credentials for the AKS cluster
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials --resource-group soft-skills-coach-rg --name chatbot_cluster
+
+      # Step 1: Explicitly delete the old deployment (optional)
+      - name: Delete previous Kubernetes deployment
+        run: |
+          kubectl delete deployment soft-skills-chatbot || true
+
+      # Step 2: Replace placeholder in deployment.yaml with the actual commit hash (dynamic image tag)
+      - name: Update deployment.yaml with image tag
+        run: |
+          sed -i 's#__IMAGE_TAG__#${{ github.sha }}#g' deployment.yaml
+
+      # Step 3: Apply the Kubernetes deployment with the updated image
+      - name: Apply Kubernetes Deployment
+        run: |
+          kubectl apply -f deployment.yaml
+
+      # Step 4: Optionally check the status of the rollout
+      - name: Check Deployment Status
+        run: |
+          kubectl rollout status deployment/soft-skills-chatbot
+
+   ```
+   Also set the connection to AKS, by putting the Azure Subscription and other relevant informaton as ACR name
+
 ## Implementation Details
 
 The chatbot utilizes a RAG approach, retrieving relevant information from stored conversations to enhance its responses. Key functionalities include:
