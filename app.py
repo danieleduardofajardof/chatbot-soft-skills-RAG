@@ -144,30 +144,19 @@ async def slack_events(req: Request):
     if 'event' in data:
         event = data['event']
 
-        # Handle file share events, especially audio transcriptions
+        # Handle file share events
         if event.get('subtype') == 'file_share' and event.get('files'):
             for file in event.get('files'):
                 file_url = file.get('url_private')
                 token = os.getenv("SLACK_BOT_TOKEN")
-
-                # Check if Slack has already provided a transcription
-                if 'transcription' in file and file['transcription']['status'] == 'complete':
-                    transcribed_text = file['transcription']['preview']['content']
-                    logger.info(f"Using Slack transcription: {transcribed_text}")
+                transcribed_text = process_audio_file(file_url, token)
+                if transcribed_text:
+                    bot_response = generate_response(transcribed_text)
+                    # Convert bot response to audio
+                    audio_file_path = text_to_speech(bot_response)
+                    send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
                 else:
-                    # If no transcription is available, download and process the audio
-                    transcribed_text = process_audio_file(file_url, token)
-                    if not transcribed_text:
-                        send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
-                        return JSONResponse(status_code=200, content={"status": "success"})
-
-                # Generate a response from the transcription
-                bot_response = generate_response(transcribed_text)
-                logger.info(f"Generated bot response: {bot_response}")
-                
-                # Convert bot response to audio
-                audio_file_path = text_to_speech(bot_response)
-                send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
+                    send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
 
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
