@@ -280,6 +280,7 @@ git add.
 git commit -m "Some comments..."
 git push
 ```
+In order to avoid login everytime, add your SSH to the repo configuration for SSH Authentication.
 ## Implementation Details
 
 The chatbot utilizes a RAG approach, retrieving relevant information from stored conversations to enhance its responses. Key functionalities include:
