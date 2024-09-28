@@ -1,24 +1,24 @@
-name: CI/CD Pipeline for ARM Architecture on AKS
+name: CI/CD Pipeline for AKS
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger pipeline on push to the main branch
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the code
+      # Checkout the code from GitHub
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Set up Docker Buildx
+      # Set up Docker Buildx for multi-platform builds (optional if needed)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Log in to Azure using the service principal stored in GitHub Secrets
+      # Log in to Azure using service principal credentials stored in GitHub Secrets
       - name: Log in to Azure
         uses: azure/login@v1
         with:
@@ -29,17 +29,32 @@ jobs:
         run: |
           az acr login --name softskillsregistry
 
-      # Build and push the Docker image for ARM architecture
-      - name: Build and Push Docker Image (ARM)
+      # Build and push the Docker image to ACR, tag it with the commit hash
+      - name: Build and Push Docker Image
         run: |
-          docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }} --push .
+          docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/softskillsbot:${{ github.sha }} --push .
 
-      # Get AKS credentials
+      # Get credentials for the AKS cluster
       - name: Get AKS credentials
         run: |
           az aks get-credentials --resource-group soft-skills-coach-rg --name chatbot_cluster
 
-      # Update Kubernetes deployment with the new ARM image
-      - name: Deploy to AKS
+      # Step 1: Explicitly delete the old deployment (optional)
+      - name: Delete previous Kubernetes deployment
         run: |
-          kubectl set image deployment/chatbot-deployment chatbot-container=softskillsregistry.azurecr.io/chatbot-softskills:${{ github.sha }}
+          kubectl delete deployment soft-skills-chatbot || true
+
+      # Step 2: Replace placeholder in deployment.yaml with the actual commit hash (dynamic image tag)
+      - name: Update deployment.yaml with image tag
+        run: |
+          sed -i 's#__IMAGE_TAG__#${{ github.sha }}#g' deployment.yaml
+
+      # Step 3: Apply the Kubernetes deployment with the updated image
+      - name: Apply Kubernetes Deployment
+        run: |
+          kubectl apply -f deployment.yaml
+
+      # Step 4: Optionally check the status of the rollout
+      - name: Check Deployment Status
+        run: |
+          kubectl rollout status deployment/soft-skills-chatbot

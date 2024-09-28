@@ -11,7 +11,7 @@ import azure.cognitiveservices.speech as speechsdk
 from openai import AzureOpenAI
 
 # Initialize Azure OpenAI client
-openai_client = AzureOpenAI(api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+openai_client = AzureOpenAI(api_key=os.getenv("AZURE_SPEECH_KEY"),
                             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
                             api_version="2023-03-15-preview")
 
