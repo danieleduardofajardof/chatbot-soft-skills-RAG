@@ -11,7 +11,7 @@ import azure.cognitiveservices.speech as speechsdk
 from openai import AzureOpenAI
 
 # Initialize Azure OpenAI client
-openai_client = AzureOpenAI(api_key=os.getenv("AZURE_SPEECH_KEY"),
+openai_client = AzureOpenAI(api_key=os.getenv("AZURE_OPENAI_API_KEY"),
                             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
                             api_version="2023-03-15-preview")
 
@@ -83,7 +83,7 @@ def save_conversation(user_id, session_id, user_input, bot_response):
 
 # Azure Voice to Text (Optional)
 def voice_to_text_azure():
-    speech_key = os.getenv("AZURE_SPEECH_KEY")
+    speech_key = os.getenv("AZURE_OPENAI_API_KEY")
     service_region = os.getenv("AZURE_REGION")
 
     speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=service_region)
@@ -107,7 +107,7 @@ def voice_to_text_azure():
 
 # Azure Text to Voice (Optional)
 def text_to_voice_azure(text):
-    speech_key = os.getenv("AZURE_SPEECH_KEY")
+    speech_key = os.getenv("AZURE_OPENAI_API_KEY")
     service_region = os.getenv("AZURE_REGION")
 
     speech_config = speechsdk.SpeechConfig(subscription=speech_key, region=service_region)
