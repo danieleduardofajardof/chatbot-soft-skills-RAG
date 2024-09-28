@@ -48,6 +48,11 @@ openai_client = AzureOpenAI(
 # Initialize FastAPI app
 app = FastAPI()
 
+# Root route for health check or basic information
+@app.get("/")
+async def root():
+    return {"message": "This is the Soft Skills Chatbot API."}
+
 # Initialize Slack client with the bot token
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
