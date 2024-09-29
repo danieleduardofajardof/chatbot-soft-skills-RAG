@@ -102,7 +102,7 @@ def process_audio_file(file_url, token):
 def generate_response(user_input):
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4",  # Ensure this matches the deployment name in Azure
+            model="gpt-35-turbo",  # Ensure this matches the deployment name in Azure
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input}
