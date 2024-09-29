@@ -1,6 +1,8 @@
 # Dockerfile
 FROM arm64v8/ubuntu:20.04
 
+# Set environment variable to avoid tzdata interaction
+ENV DEBIAN_FRONTEND=noninteractive
 # Install Python and pip
 RUN apt-get update && apt-get install -y \
     python3 \
