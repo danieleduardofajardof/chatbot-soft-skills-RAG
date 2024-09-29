@@ -9,7 +9,7 @@ spec:
       app: soft-skills-chatbot
   template:
     metadata:
-      labels:
+      labels:a
         app: soft-skills-chatbot
     spec:
       securityContext:
@@ -48,5 +48,14 @@ spec:
           valueFrom:
             secretKeyRef:
               name: softskills-secrets
-              key: AZURE_REGION
-        # Include any other necessary environment variables
+              key: AZURE_REGION     
+        - name: AZURE_STORAGE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_STORAGE_CONNECTION_STRING
+        - name: AZURE_STORAGE_CONTAINER_NAME
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_STORAGE_CONTAINER_NAME
