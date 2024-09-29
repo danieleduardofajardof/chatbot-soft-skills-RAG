@@ -53,6 +53,15 @@ app = FastAPI()
 @app.get("/")
 async def root():
     return {"message": "This is the Soft Skills Chatbot API."}
+@app.on_event("startup")
+async def startup_event():
+    try:
+        # Log file permissions for /app directory
+        app_dir_stat = os.stat("/app")
+        logger.info(f"Directory /app permissions: {oct(app_dir_stat.st_mode)}")
+        logger.info(f"Owner UID: {app_dir_stat.st_uid}, GID: {app_dir_stat.st_gid}")
+    except Exception as e:
+        logger.error(f"Error checking /app directory permissions: {str(e)}")
 
 # Initialize Slack client with the bot token
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
@@ -107,29 +116,33 @@ def process_audio_file(file_url, token):
     }
     response = requests.get(file_url, headers=headers)
     file_path = "/app/received_audio.m4a"
+    # Check /app directory permissions before writing
+    try:
+        app_dir_stat = os.stat("/app")
+        logger.info(f"Before file write - Directory /app permissions: {oct(app_dir_stat.st_mode)}")
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
 
-    with open(file_path, 'wb') as f:
-        f.write(response.content)
+        if os.path.exists(file_path):
+            file_size = os.path.getsize(file_path)
+            logger.info(f"Received and saved audio file to {file_path}, file size: {file_size} bytes")
+        else:
+            logger.error(f"File {file_path} not found after download.")
+            return None
+        # Convert .m4a to .wav
+        wav_file_path = "/app/converted_audio.wav"
+        convert_m4a_to_wav(file_path, wav_file_path)
 
-    if os.path.exists(file_path):
-        file_size = os.path.getsize(file_path)
-        logger.info(f"Received and saved audio file to {file_path}, file size: {file_size} bytes")
-    else:
-        logger.error(f"File {file_path} not found after download.")
-        return None
-    # Convert .m4a to .wav
-    wav_file_path = "/app/converted_audio.wav"
-    convert_m4a_to_wav(file_path, wav_file_path)
-
-    # Convert audio to text using Azure Speech-to-Text on the WAV file
-    transcribed_text = speech_to_text(wav_file_path)
-    if transcribed_text:
-        logger.info(f"Transcribed Text: {transcribed_text}")
-        return transcribed_text
-    else:
-        logger.error("Failed to transcribe the audio.")
-        return None
-
+        # Convert audio to text using Azure Speech-to-Text on the WAV file
+        transcribed_text = speech_to_text(wav_file_path)
+        if transcribed_text:
+            logger.info(f"Transcribed Text: {transcribed_text}")
+            return transcribed_text
+        else:
+            logger.error("Failed to transcribe the audio.")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to write file {file_path}: {str(e)}")
 
 # Generate a response using Azure OpenAI's GPT model (GPT-3.5)
 def generate_response(user_input):
