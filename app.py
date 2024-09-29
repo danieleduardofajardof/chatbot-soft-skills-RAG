@@ -166,40 +166,58 @@ def process_audio_file(file_url, token):
         "Authorization": f"Bearer {token}"
     }
     response = requests.get(file_url, headers=headers)
-    file_path = "/tmp/received_audio.m4a"  # Temporary local file path
     
     try:
-        with open(file_path, 'wb') as f:
-            f.write(response.content)
-        
-        if os.path.exists(file_path):
-            file_size = os.path.getsize(file_path)
-            logger.info(f"Received and saved audio file locally to {file_path}, file size: {file_size} bytes")
-            
-            # Upload the .m4a file to Blob Storage
-            blob_name_m4a = "received_audio.m4a"
-            blob_url_m4a = upload_to_blob(file_path, blob_name_m4a)
-            
-            # Convert .m4a to .wav
-            wav_file_path = "/tmp/converted_audio.wav"
-            convert_m4a_to_wav(file_path, wav_file_path)
+        # Download file and save locally
+        file_path = "/tmp/received_audio.m4a"  # Temporary local file path
+        if response.status_code == 200:
+            with open(file_path, 'wb') as f:
+                f.write(response.content)
+            logger.info(f"Downloaded audio file to {file_path}")
 
-            # Upload the .wav file to Blob Storage
-            blob_name_wav = "converted_audio.wav"
-            blob_url_wav = upload_to_blob(wav_file_path, blob_name_wav)
+            if os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                logger.info(f"Audio file size: {file_size} bytes")
 
-            # Use Azure Speech-to-Text on the uploaded .wav file
-            transcribed_text = speech_to_text(wav_file_path)
-            
-            if transcribed_text:
-                logger.info(f"Transcribed Text: {transcribed_text}")
-                return transcribed_text
+                # Upload the .m4a file to Blob Storage
+                blob_name_m4a = "received_audio.m4a"
+                blob_url_m4a = upload_to_blob(file_path, blob_name_m4a)
+                if blob_url_m4a:
+                    logger.info(f".m4a file uploaded to Blob Storage: {blob_url_m4a}")
+                else:
+                    logger.error("Failed to upload .m4a file to Blob Storage")
+
+                # Convert .m4a to .wav
+                wav_file_path = "/tmp/converted_audio.wav"
+                convert_m4a_to_wav(file_path, wav_file_path)
+                if os.path.exists(wav_file_path):
+                    logger.info(f"Successfully converted .m4a to .wav: {wav_file_path}")
+                else:
+                    logger.error("Failed to convert .m4a to .wav")
+
+                # Upload the .wav file to Blob Storage
+                blob_name_wav = "converted_audio.wav"
+                blob_url_wav = upload_to_blob(wav_file_path, blob_name_wav)
+                if blob_url_wav:
+                    logger.info(f".wav file uploaded to Blob Storage: {blob_url_wav}")
+                else:
+                    logger.error("Failed to upload .wav file to Blob Storage")
+
+                # Transcribe the .wav file using Azure Speech-to-Text
+                transcribed_text = speech_to_text(wav_file_path)
+                if transcribed_text:
+                    logger.info(f"Transcribed text: {transcribed_text}")
+                    return transcribed_text
+                else:
+                    logger.error("Failed to transcribe audio using Azure Speech-to-Text")
+                    return None
             else:
-                logger.error("Failed to transcribe the audio.")
+                logger.error(f"File {file_path} not found after download.")
                 return None
         else:
-            logger.error(f"File {file_path} not found after download.")
+            logger.error(f"Failed to download file from Slack. Status code: {response.status_code}")
             return None
+
     except Exception as e:
         logger.error(f"Failed to process audio file: {str(e)}")
         return None
@@ -268,11 +286,9 @@ async def slack_events(req: Request):
             logger.info("Files found in the event")
             for file in event.get('files'):
                 logger.info(f"File received: {file}")
-                if file.get('filetype') == 'm4a':  # Corrected to check each file's type
-                    logger.info("Audio m4a received")
-                    file_url = file.get('url_private')
-                    token = os.getenv("SLACK_BOT_TOKEN")
-
+                file_url = file.get('url_private')
+                token = os.getenv("SLACK_BOT_TOKEN")
+                try:
                     transcribed_text = process_audio_file(file_url, token)
                     if transcribed_text:
                         bot_response = generate_response(transcribed_text)
@@ -281,8 +297,13 @@ async def slack_events(req: Request):
                         logger.info(f"Generated audio file path: {audio_file_path}")
                         send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
                     else:
-                        send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
+                            send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
+               
+                except Exception as e:
+                    logger.error(f"Failed to process audio file: {str(e)}")
 
+
+                    
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
             logger.info("Processing text message")
