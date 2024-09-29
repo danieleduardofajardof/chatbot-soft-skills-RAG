@@ -12,6 +12,12 @@ spec:
       labels:
         app: soft-skills-chatbot
     spec:
+      securityContext:
+        runAsUser: 1000            # Run all containers as this user
+        runAsGroup: 3000            # Run all containers in this group
+        fsGroup: 2000               # File system group for the pod
+        seccompProfile:
+          type: RuntimeDefault 
       containers:
       - name: soft-skills-chatbot
         image: softskillsregistry.azurecr.io/softskillsbot:latest
