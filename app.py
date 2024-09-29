@@ -10,6 +10,19 @@ from fastapi.responses import JSONResponse
 import azure.cognitiveservices.speech as speechsdk
 import requests
 from openai import AzureOpenAI
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+
+# Initialize Azure Blob Storage client
+blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
+container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
+container_client = blob_service_client.get_container_client(container_name)
+
+# Ensure the container exists
+try:
+    container_client.create_container()
+except Exception as e:
+    logger.info(f"Container already exists: {str(e)}")
+
 
 # MongoDB connection for logging
 mongo_client = MongoClient(os.getenv("COSMOS_DB_CONNECTION_STRING"))
@@ -85,15 +98,23 @@ def speech_to_text(file_path):
             logger.error(f"Error details: {cancellation_details.error_details}")
     return None
 
-# Azure Text to Speech using AZURE_SPEECH_API_KEY
 def text_to_speech(response_text):
-    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))  # Use AZURE_SPEECH_API_KEY for speech services
-    audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))  
+    audio_config = speechsdk.audio.AudioOutputConfig(filename="/tmp/response_audio.wav")  # Temporary file
 
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
     synthesizer.speak_text_async(response_text).get()
-    logger.info(f"Response audio saved as response_audio.wav")
-    return "response_audio.wav"
+
+    # Upload the synthesized audio to Blob Storage
+    blob_name = "response_audio.wav"
+    blob_url = upload_to_blob("/tmp/response_audio.wav", blob_name)
+    
+    if blob_url:
+        logger.info(f"Response audio uploaded to Blob Storage: {blob_url}")
+        return blob_url
+    else:
+        logger.error("Failed to upload response audio to Blob Storage")
+        return None
 
 # Process audio files and convert to text
 from pydub import AudioSegment
@@ -110,40 +131,64 @@ def convert_m4a_to_wav(input_file_path, output_file_path):
     logger.info(f"Converted {input_file_path} to {output_file_path}")
 
 # Example usage in process_audio_file function
+def upload_to_blob(file_path, blob_name):
+    try:
+        # Create a blob client
+        blob_client = container_client.get_blob_client(blob_name)
+        
+        # Upload the file to the blob
+        with open(file_path, "rb") as data:
+            blob_client.upload_blob(data, overwrite=True)
+        
+        logger.info(f"Uploaded {file_path} to Blob Storage as {blob_name}")
+        return blob_client.url  # Return the Blob URL for access
+    except Exception as e:
+        logger.error(f"Failed to upload {file_path} to Blob Storage: {str(e)}")
+        return None
+
 def process_audio_file(file_url, token):
     headers = {
         "Authorization": f"Bearer {token}"
     }
     response = requests.get(file_url, headers=headers)
-    file_path = "/tmp/received_audio.m4a"
-    # Check /app directory permissions before writing
+    file_path = "/tmp/received_audio.m4a"  # Temporary local file path
+    
     try:
-        app_dir_stat = os.stat("/app")
-        logger.info(f"Before file write - Directory /app permissions: {oct(app_dir_stat.st_mode)}")
         with open(file_path, 'wb') as f:
             f.write(response.content)
-
+        
         if os.path.exists(file_path):
             file_size = os.path.getsize(file_path)
-            logger.info(f"Received and saved audio file to {file_path}, file size: {file_size} bytes")
+            logger.info(f"Received and saved audio file locally to {file_path}, file size: {file_size} bytes")
+            
+            # Upload the .m4a file to Blob Storage
+            blob_name_m4a = "received_audio.m4a"
+            blob_url_m4a = upload_to_blob(file_path, blob_name_m4a)
+            
+            # Convert .m4a to .wav
+            wav_file_path = "/tmp/converted_audio.wav"
+            convert_m4a_to_wav(file_path, wav_file_path)
+
+            # Upload the .wav file to Blob Storage
+            blob_name_wav = "converted_audio.wav"
+            blob_url_wav = upload_to_blob(wav_file_path, blob_name_wav)
+
+            # Use Azure Speech-to-Text on the uploaded .wav file
+            transcribed_text = speech_to_text(wav_file_path)
+            
+            if transcribed_text:
+                logger.info(f"Transcribed Text: {transcribed_text}")
+                return transcribed_text
+            else:
+                logger.error("Failed to transcribe the audio.")
+                return None
         else:
             logger.error(f"File {file_path} not found after download.")
             return None
-        # Convert .m4a to .wav
-        wav_file_path = "/tmp/converted_audio.wav"
-        convert_m4a_to_wav(file_path, wav_file_path)
-
-        # Convert audio to text using Azure Speech-to-Text on the WAV file
-        transcribed_text = speech_to_text(wav_file_path)
-        if transcribed_text:
-            logger.info(f"Transcribed Text: {transcribed_text}")
-            return transcribed_text
-        else:
-            logger.error("Failed to transcribe the audio.")
-            return None
     except Exception as e:
-        logger.error(f"Failed to write file {file_path}: {str(e)}")
+        logger.error(f"Failed to process audio file: {str(e)}")
         return None
+
 
 # Generate a response using Azure OpenAI's GPT model (GPT-3.5)
 def generate_response(user_input):

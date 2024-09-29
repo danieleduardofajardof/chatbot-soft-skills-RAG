@@ -299,6 +299,27 @@ kubectl exec -it $(kubectl get pods --selector=app=soft-skills-chatbot -o jsonpa
 ```
 
 
+## Step 9: Update secfrets inside AKS
+```bash
+kubectl apply -f softskills-secrets.yaml 
+```
+Having a secrets.yaml like this:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: softskills-secrets
+type: Opaque
+stringData:  # stringData allows plain text; Kubernetes will automatically base64 encode the values.
+  AZURE_OPENAI_API_KEY: <secret>
+  AZURE_OPENAI_ENDPOINT: <secret>
+  AZURE_REGION: "eastus"
+  COSMOS_DB_CONNECTION_STRING: <secret>
+  SLACK_BOT_TOKEN: <secret>
+  AZURE_SPEECH_API_KEY: <secret>
+  AZURE_STORAGE_CONNECTION_STRING: <secret>
+  AZURE_STORAGE_CONTAINER_NAME: <secret>
+```
 
 
 
