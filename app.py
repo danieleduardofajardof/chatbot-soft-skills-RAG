@@ -36,11 +36,12 @@ logger.addHandler(CosmosDBHandler())  # Add custom handler to store logs in Cosm
 
 # Log environment variables for debugging (only log that they exist, no values)
 logger.info(f"AZURE_OPENAI_API_KEY exists: {bool(os.getenv('AZURE_OPENAI_API_KEY'))}")
+logger.info(f"AZURE_SPEECH_API_KEY exists: {bool(os.getenv('AZURE_SPEECH_API_KEY'))}")
 logger.info(f"AZURE_OPENAI_ENDPOINT exists: {bool(os.getenv('AZURE_OPENAI_ENDPOINT'))}")
 
-# Initialize the OpenAI client
+# Initialize the OpenAI client for GPT-3.5 (Azure OpenAI)
 openai_client = AzureOpenAI(
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),  # Key for GPT-3.5 model
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     api_version="2023-03-15-preview"
 )
@@ -56,9 +57,9 @@ async def root():
 # Initialize Slack client with the bot token
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
-# Azure Speech to Text
+# Azure Speech to Text using AZURE_SPEECH_API_KEY
 def speech_to_text(file_path):
-    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))  # Use AZURE_SPEECH_API_KEY for speech services
     audio_config = speechsdk.audio.AudioConfig(filename=file_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     
@@ -69,9 +70,9 @@ def speech_to_text(file_path):
         logger.error("Speech recognition failed or no speech detected.")
         return None
 
-# Azure Text to Speech
+# Azure Text to Speech using AZURE_SPEECH_API_KEY
 def text_to_speech(response_text):
-    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_KEY"), region=os.getenv("AZURE_REGION"))
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))  # Use AZURE_SPEECH_API_KEY for speech services
     audio_config = speechsdk.audio.AudioOutputConfig(filename="response_audio.wav")
 
     synthesizer = speechsdk.SpeechSynthesizer(speech_config=speech_config, audio_config=audio_config)
@@ -98,11 +99,11 @@ def process_audio_file(file_url, token):
     logger.info(f"Transcribed text: {transcribed_text}")
     return transcribed_text
 
-# Generate a response using Azure OpenAI's GPT model
+# Generate a response using Azure OpenAI's GPT model (GPT-3.5)
 def generate_response(user_input):
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4",  # Ensure this matches the deployment name in Azure
+            model="gpt-35-turbo",  # Ensure this matches the deployment name in Azure for GPT-3.5
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input}
