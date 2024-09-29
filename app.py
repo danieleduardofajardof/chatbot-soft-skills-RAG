@@ -106,16 +106,19 @@ def process_audio_file(file_url, token):
         "Authorization": f"Bearer {token}"
     }
     response = requests.get(file_url, headers=headers)
-    file_path = "received_audio.m4a"
+    file_path = "/app/received_audio.m4a"
 
     with open(file_path, 'wb') as f:
         f.write(response.content)
 
-    # Log file processing status
-    logger.info(f"Received and saved audio file to {file_path}")
-
+    if os.path.exists(file_path):
+        file_size = os.path.getsize(file_path)
+        logger.info(f"Received and saved audio file to {file_path}, file size: {file_size} bytes")
+    else:
+        logger.error(f"File {file_path} not found after download.")
+        return None
     # Convert .m4a to .wav
-    wav_file_path = "converted_audio.wav"
+    wav_file_path = "/app/converted_audio.wav"
     convert_m4a_to_wav(file_path, wav_file_path)
 
     # Convert audio to text using Azure Speech-to-Text on the WAV file
