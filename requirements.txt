@@ -6,3 +6,4 @@ torch
 pymongo
 azure-cognitiveservices-speech==1.40.0
 openai
+pydub

@@ -87,6 +87,20 @@ def text_to_speech(response_text):
     return "response_audio.wav"
 
 # Process audio files and convert to text
+from pydub import AudioSegment
+import os
+
+def convert_m4a_to_wav(input_file_path, output_file_path):
+    """
+    Converts an M4A audio file to WAV format.
+    :param input_file_path: Path to the input M4A file.
+    :param output_file_path: Path to save the converted WAV file.
+    """
+    audio = AudioSegment.from_file(input_file_path, format="m4a")
+    audio.export(output_file_path, format="wav")
+    logger.info(f"Converted {input_file_path} to {output_file_path}")
+
+# Example usage in process_audio_file function
 def process_audio_file(file_url, token):
     headers = {
         "Authorization": f"Bearer {token}"
@@ -100,14 +114,19 @@ def process_audio_file(file_url, token):
     # Log file processing status
     logger.info(f"Received and saved audio file to {file_path}")
 
-    # Convert audio to text using Azure Speech-to-Text
-    transcribed_text = speech_to_text(file_path)
+    # Convert .m4a to .wav
+    wav_file_path = "converted_audio.wav"
+    convert_m4a_to_wav(file_path, wav_file_path)
+
+    # Convert audio to text using Azure Speech-to-Text on the WAV file
+    transcribed_text = speech_to_text(wav_file_path)
     if transcribed_text:
         logger.info(f"Transcribed Text: {transcribed_text}")
         return transcribed_text
     else:
         logger.error("Failed to transcribe the audio.")
         return None
+
 
 # Generate a response using Azure OpenAI's GPT model (GPT-3.5)
 def generate_response(user_input):
