@@ -354,7 +354,7 @@ async def slack_events(req: Request) -> JSONResponse:
                 bot_response = generate_response(user_input)
                 log_conversation(user_id, user_input, bot_response)
                 send_response_to_slack(channel, bot_response)
-        elif 'files' in event:
+        else:
             logger.info("Files found in the event")
             for file in event.get('files'):
                 logger.info(f"File received: {file}")

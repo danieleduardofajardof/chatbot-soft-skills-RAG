@@ -25,7 +25,7 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install azure-storage-blob==12.23.1
 
 # Copy the application code
 COPY . .
