@@ -11,9 +11,18 @@ import azure.cognitiveservices.speech as speechsdk
 import requests
 from openai import AzureOpenAI
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from pydub import AudioSegment
+
 # Custom logging handler to store logs in CosmosDB
 class CosmosDBHandler(logging.Handler):
+    """Custom logging handler that stores logs in a MongoDB collection."""
     def emit(self, record):
+        """
+        Logs the record to MongoDB.
+        
+        Parameters:
+        - record: logging.LogRecord - The log record to be stored.
+        """
         log_entry = {
             "level": record.levelname,
             "message": record.getMessage(),
@@ -34,17 +43,16 @@ mongo_client = MongoClient(os.getenv("COSMOS_DB_CONNECTION_STRING"))
 db = mongo_client['soft_skills_chatbot']
 logs_collection = db['logs']
 
-
+# Logging for environment variables
 logger.info(f"AZURE_STORAGE_CONNECTION_STRING exists: {bool(os.getenv('AZURE_STORAGE_CONNECTION_STRING'))}")
 logger.info(f"AZURE_STORAGE_CONTAINER_NAME exists: {bool(os.getenv('AZURE_STORAGE_CONTAINER_NAME'))}")
 
-
+# Blob Storage setup
 try:
     blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
     logger.info("Successfully connected to Azure Blob Storage")
 except Exception as e:
     logger.error(f"Failed to connect to Azure Blob Storage: {str(e)}")
-
 
 container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 container_client = blob_service_client.get_container_client(container_name)
@@ -55,19 +63,7 @@ try:
 except Exception as e:
     logger.info(f"Container already exists: {str(e)}")
 
-
-# MongoDB connection for logging
-mongo_client = MongoClient(os.getenv("COSMOS_DB_CONNECTION_STRING"))
-db = mongo_client['soft_skills_chatbot']
-logs_collection = db['logs']
-
-
-# Log environment variables for debugging (only log that they exist, no values)
-logger.info(f"AZURE_OPENAI_API_KEY exists: {bool(os.getenv('AZURE_OPENAI_API_KEY'))}")
-logger.info(f"AZURE_SPEECH_API_KEY exists: {bool(os.getenv('AZURE_SPEECH_API_KEY'))}")
-logger.info(f"AZURE_OPENAI_ENDPOINT exists: {bool(os.getenv('AZURE_OPENAI_ENDPOINT'))}")
-
-# Initialize the OpenAI client for GPT-3.5 (Azure OpenAI)
+# Azure OpenAI client initialization
 openai_client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),  # Key for GPT-3.5 model
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
@@ -77,14 +73,25 @@ openai_client = AzureOpenAI(
 # Initialize FastAPI app
 app = FastAPI()
 
-# Root route for health check or basic information
 @app.get("/")
-async def root():
+async def root() -> dict:
+    """
+    Root route for basic health check.
+    
+    Returns:
+    - dict: A dictionary containing a health check message.
+    """
     return {"message": "This is the Soft Skills Chatbot API."}
+
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
+    """
+    Startup event handler that logs directory permissions.
+    
+    Returns:
+    - None
+    """
     try:
-        # Log file permissions for /app directory
         app_dir_stat = os.stat("/app")
         logger.info(f"Directory /app permissions: {oct(app_dir_stat.st_mode)}")
         logger.info(f"Owner UID: {app_dir_stat.st_uid}, GID: {app_dir_stat.st_gid}")
@@ -94,8 +101,16 @@ async def startup_event():
 # Initialize Slack client with the bot token
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
-# Azure Speech to Text using AZURE_SPEECH_API_KEY
-def speech_to_text(file_path):
+def speech_to_text(file_path: str) -> str:
+    """
+    Converts speech in an audio file to text using Azure Speech-to-Text.
+    
+    Parameters:
+    - file_path: str - The path to the audio file.
+
+    Returns:
+    - str: The recognized speech as text or None if recognition fails.
+    """
     speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))
     audio_config = speechsdk.audio.AudioConfig(filename=file_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
@@ -113,7 +128,16 @@ def speech_to_text(file_path):
             logger.error(f"Error details: {cancellation_details.error_details}")
     return None
 
-def text_to_speech(response_text):
+def text_to_speech(response_text: str) -> str:
+    """
+    Converts text to speech using Azure Speech-to-Text and uploads it to Blob Storage.
+    
+    Parameters:
+    - response_text: str - The text to be converted to speech.
+    
+    Returns:
+    - str: The URL of the uploaded audio file in Blob Storage or None if the upload fails.
+    """
     speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))  
     audio_config = speechsdk.audio.AudioOutputConfig(filename="/tmp/response_audio.wav")  # Temporary file
 
@@ -131,88 +155,85 @@ def text_to_speech(response_text):
         logger.error("Failed to upload response audio to Blob Storage")
         return None
 
-# Process audio files and convert to text
-from pydub import AudioSegment
-import os
-
-def convert_m4a_to_wav(input_file_path, output_file_path):
+def convert_m4a_to_wav(input_file_path: str, output_file_path: str) -> None:
     """
     Converts an M4A audio file to WAV format.
-    :param input_file_path: Path to the input M4A file.
-    :param output_file_path: Path to save the converted WAV file.
+    
+    Parameters:
+    - input_file_path: str - The path to the input M4A file.
+    - output_file_path: str - The path to save the converted WAV file.
+    
+    Returns:
+    - None
     """
     audio = AudioSegment.from_file(input_file_path, format="m4a")
     audio.export(output_file_path, format="wav")
     logger.info(f"Converted {input_file_path} to {output_file_path}")
 
-# Example usage in process_audio_file function
-def upload_to_blob(file_path, blob_name):
+def upload_to_blob(file_path: str, blob_name: str) -> str:
+    """
+    Uploads a file to Azure Blob Storage.
+    
+    Parameters:
+    - file_path: str - The path to the file to be uploaded.
+    - blob_name: str - The name of the blob in Azure Blob Storage.
+    
+    Returns:
+    - str: The URL of the uploaded file in Blob Storage, or None if the upload fails.
+    """
     try:
-        # Create a blob client
         blob_client = container_client.get_blob_client(blob_name)
-        
-        # Upload the file to the blob
         with open(file_path, "rb") as data:
             blob_client.upload_blob(data, overwrite=True)
-        
         logger.info(f"Uploaded {file_path} to Blob Storage as {blob_name}")
         return blob_client.url  # Return the Blob URL for access
     except Exception as e:
         logger.error(f"Failed to upload {file_path} to Blob Storage: {str(e)}")
         return None
 
-def process_audio_file(file_url, token):
+def process_audio_file(file_url: str, token: str) -> str:
+    """
+    Processes an audio file from Slack: downloads, uploads to Blob, converts to WAV, and transcribes.
+    
+    Parameters:
+    - file_url: str - The URL of the audio file to be processed.
+    - token: str - The Slack authentication token for accessing the file.
+
+    Returns:
+    - str: The transcribed text or None if transcription fails.
+    """
     headers = {
         "Authorization": f"Bearer {token}"
     }
-    response = requests.get(file_url, headers=headers)
     
     try:
-        # Download file and save locally
-        file_path = "/tmp/received_audio.m4a"  # Temporary local file path
+        response = requests.get(file_url, headers=headers, stream=True)
         if response.status_code == 200:
-            with open(file_path, 'wb') as f:
-                f.write(response.content)
-            logger.info(f"Downloaded audio file to {file_path}")
+            logger.info(f"File download from Slack successful. Status code: {response.status_code}")
 
-            if os.path.exists(file_path):
-                file_size = os.path.getsize(file_path)
-                logger.info(f"Audio file size: {file_size} bytes")
+            # Upload the .m4a file to Blob Storage directly
+            blob_name_m4a = "received_audio.m4a"
+            blob_client = container_client.get_blob_client(blob_name_m4a)
+            blob_client.upload_blob(response.raw, overwrite=True)
+            logger.info(f".m4a file uploaded directly to Blob Storage: {blob_client.url}")
 
-                # Upload the .m4a file to Blob Storage
-                blob_name_m4a = "received_audio.m4a"
-                blob_url_m4a = upload_to_blob(file_path, blob_name_m4a)
-                if blob_url_m4a:
-                    logger.info(f".m4a file uploaded to Blob Storage: {blob_url_m4a}")
-                else:
-                    logger.error("Failed to upload .m4a file to Blob Storage")
-
-                # Convert .m4a to .wav
-                wav_file_path = "/tmp/converted_audio.wav"
-                convert_m4a_to_wav(file_path, wav_file_path)
-                if os.path.exists(wav_file_path):
-                    logger.info(f"Successfully converted .m4a to .wav: {wav_file_path}")
-                else:
-                    logger.error("Failed to convert .m4a to .wav")
-
-                # Upload the .wav file to Blob Storage
-                blob_name_wav = "converted_audio.wav"
-                blob_url_wav = upload_to_blob(wav_file_path, blob_name_wav)
-                if blob_url_wav:
-                    logger.info(f".wav file uploaded to Blob Storage: {blob_url_wav}")
-                else:
-                    logger.error("Failed to upload .wav file to Blob Storage")
-
-                # Transcribe the .wav file using Azure Speech-to-Text
-                transcribed_text = speech_to_text(wav_file_path)
-                if transcribed_text:
-                    logger.info(f"Transcribed text: {transcribed_text}")
-                    return transcribed_text
-                else:
-                    logger.error("Failed to transcribe audio using Azure Speech-to-Text")
-                    return None
+            # Process the .m4a file and convert to .wav in memory
+            audio_data = AudioSegment.from_file(response.raw, format="m4a")
+            wav_file_buffer = audio_data.export(format="wav")
+            
+            # Upload the .wav file to Blob Storage directly
+            blob_name_wav = "converted_audio.wav"
+            blob_client_wav = container_client.get_blob_client(blob_name_wav)
+            blob_client_wav.upload_blob(wav_file_buffer, overwrite=True)
+            logger.info(f".wav file uploaded directly to Blob Storage: {blob_client_wav.url}")
+            
+            # Transcribe the .wav file using Azure Speech-to-Text
+            transcribed_text = speech_to_text(blob_client_wav.url)
+            if transcribed_text:
+                logger.info(f"Transcribed text: {transcribed_text}")
+                return transcribed_text
             else:
-                logger.error(f"File {file_path} not found after download.")
+                logger.error("Failed to transcribe audio using Azure Speech-to-Text")
                 return None
         else:
             logger.error(f"Failed to download file from Slack. Status code: {response.status_code}")
@@ -222,9 +243,16 @@ def process_audio_file(file_url, token):
         logger.error(f"Failed to process audio file: {str(e)}")
         return None
 
-
-# Generate a response using Azure OpenAI's GPT model (GPT-3.5)
-def generate_response(user_input):
+def generate_response(user_input: str) -> str:
+    """
+    Generates a chatbot response using Azure OpenAI GPT-3.5.
+    
+    Parameters:
+    - user_input: str - The input text from the user.
+    
+    Returns:
+    - str: The generated response or an error message if generation fails.
+    """
     try:
         response = openai_client.chat.completions.create(
             model="gpt-35-turbo",  # Ensure this matches the deployment name in Azure for GPT-3.5
@@ -237,7 +265,6 @@ def generate_response(user_input):
             stop=None,
             temperature=0.7
         )
-        # Log the API response for debugging
         bot_response = response.choices[0].message.content.strip()
         logger.info(f"Generated bot response: {bot_response}")
         return bot_response
@@ -245,8 +272,18 @@ def generate_response(user_input):
         logger.error(f"Error generating response from Azure OpenAI: {e}")
         return "I'm sorry, I'm having trouble generating a response right now."
 
-# Send response back to Slack
-def send_response_to_slack(channel, response, file_path=None):
+def send_response_to_slack(channel: str, response: str, file_path: str = None) -> None:
+    """
+    Sends a response back to Slack, either as text or an audio file.
+    
+    Parameters:
+    - channel: str - The Slack channel where the response should be sent.
+    - response: str - The response text to be sent.
+    - file_path: str, optional - The path to an audio file to be uploaded (default is None).
+
+    Returns:
+    - None
+    """
     try:
         if file_path:
             logger.info(f"Uploading audio response to Slack: {file_path}")
@@ -258,8 +295,18 @@ def send_response_to_slack(channel, response, file_path=None):
     except Exception as e:
         logger.error(f"Unexpected error sending message: {e}")
 
-# Log user and bot interactions
-def log_conversation(user_id, user_input, bot_response):
+def log_conversation(user_id: str, user_input: str, bot_response: str) -> None:
+    """
+    Logs user and bot interactions to the database.
+    
+    Parameters:
+    - user_id: str - The ID of the user who interacted with the bot.
+    - user_input: str - The input provided by the user.
+    - bot_response: str - The response generated by the bot.
+    
+    Returns:
+    - None
+    """
     log_entry = {
         "user_id": user_id,
         "timestamp": datetime.utcnow().isoformat(),
@@ -268,9 +315,17 @@ def log_conversation(user_id, user_input, bot_response):
     }
     logs_collection.insert_one(log_entry)
 
-# Slack event handler
 @app.post('/slack/events')
-async def slack_events(req: Request):
+async def slack_events(req: Request) -> JSONResponse:
+    """
+    Slack event handler to process events such as messages or file shares.
+
+    Parameters:
+    - req: Request - The incoming request object from Slack containing the event data.
+    
+    Returns:
+    - JSONResponse: A JSON response indicating success or failure.
+    """
     data = await req.json()
     logger.info(f"Received event: {data}")
 
@@ -297,12 +352,10 @@ async def slack_events(req: Request):
                         logger.info(f"Generated audio file path: {audio_file_path}")
                         send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
                     else:
-                            send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
+                        send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
                
                 except Exception as e:
                     logger.error(f"Failed to process audio file: {str(e)}")
-
-
                     
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
@@ -322,8 +375,12 @@ async def slack_events(req: Request):
 
     return JSONResponse(status_code=200, content={"status": "success"})
 
-
-# Health check endpoint
 @app.get("/healthz")
-async def healthz():
+async def healthz() -> dict:
+    """
+    Health check endpoint.
+    
+    Returns:
+    - dict: A dictionary indicating the service's health status.
+    """
     return {"status": "healthy"}
