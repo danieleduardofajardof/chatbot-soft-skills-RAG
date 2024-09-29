@@ -205,11 +205,12 @@ async def slack_events(req: Request):
 
         # Handle file share events
         if 'files' in event:
-            if event['files']['filetype']=='m4a':
-                logger.info("Audio m4a received")
-                for file in event.get('files'):
+            for file in event.get('files'):
+                if file.get('filetype') == 'm4a':  # Corrected to check each file's type
+                    logger.info("Audio m4a received")
                     file_url = file.get('url_private')
                     token = os.getenv("SLACK_BOT_TOKEN")
+
                     transcribed_text = process_audio_file(file_url, token)
                     if transcribed_text:
                         bot_response = generate_response(transcribed_text)
@@ -236,6 +237,7 @@ async def slack_events(req: Request):
                 send_response_to_slack(channel, bot_response)
 
     return JSONResponse(status_code=200, content={"status": "success"})
+
 
 # Health check endpoint
 @app.get("/healthz")
