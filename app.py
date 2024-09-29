@@ -337,7 +337,24 @@ async def slack_events(req: Request) -> JSONResponse:
         event = data['event']
 
         # Handle file share events
-        if 'files' in event:
+        
+                    
+        # Handle text message events
+        if event.get('type') == 'message' and 'subtype' not in event:
+            logger.info("Processing text message")
+            user_input = event.get('text', '').strip()
+            user_id = event.get('user', '')
+            channel = event.get('channel', '')
+
+            # Get the bot's user ID to prevent it from responding to itself
+            auth_response = slack_client.auth_test()
+            bot_user_id = auth_response['user_id']
+
+            if user_input and user_id and channel and user_id != bot_user_id:
+                bot_response = generate_response(user_input)
+                log_conversation(user_id, user_input, bot_response)
+                send_response_to_slack(channel, bot_response)
+        elif 'files' in event:
             logger.info("Files found in the event")
             for file in event.get('files'):
                 logger.info(f"File received: {file}")
@@ -356,22 +373,6 @@ async def slack_events(req: Request) -> JSONResponse:
                
                 except Exception as e:
                     logger.error(f"Failed to process audio file: {str(e)}")
-                    
-        # Handle text message events
-        elif event.get('type') == 'message' and 'subtype' not in event:
-            logger.info("Processing text message")
-            user_input = event.get('text', '').strip()
-            user_id = event.get('user', '')
-            channel = event.get('channel', '')
-
-            # Get the bot's user ID to prevent it from responding to itself
-            auth_response = slack_client.auth_test()
-            bot_user_id = auth_response['user_id']
-
-            if user_input and user_id and channel and user_id != bot_user_id:
-                bot_response = generate_response(user_input)
-                log_conversation(user_id, user_input, bot_response)
-                send_response_to_slack(channel, bot_response)
 
     return JSONResponse(status_code=200, content={"status": "success"})
 
