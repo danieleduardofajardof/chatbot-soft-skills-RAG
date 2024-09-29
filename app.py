@@ -206,19 +206,19 @@ async def slack_events(req: Request):
         # Handle file share events
         if 'files' in event:
             if event['files']['filetype']=='m4a':
-            logger.info("Audio m4a received")
-            for file in event.get('files'):
-                file_url = file.get('url_private')
-                token = os.getenv("SLACK_BOT_TOKEN")
-                transcribed_text = process_audio_file(file_url, token)
-                if transcribed_text:
-                    bot_response = generate_response(transcribed_text)
-                    # Convert bot response to audio
-                    audio_file_path = text_to_speech(bot_response)
-                    logger.info(f"Generated audio file path: {audio_file_path}")
-                    send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
-                else:
-                    send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
+                logger.info("Audio m4a received")
+                for file in event.get('files'):
+                    file_url = file.get('url_private')
+                    token = os.getenv("SLACK_BOT_TOKEN")
+                    transcribed_text = process_audio_file(file_url, token)
+                    if transcribed_text:
+                        bot_response = generate_response(transcribed_text)
+                        # Convert bot response to audio
+                        audio_file_path = text_to_speech(bot_response)
+                        logger.info(f"Generated audio file path: {audio_file_path}")
+                        send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
+                    else:
+                        send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
 
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
