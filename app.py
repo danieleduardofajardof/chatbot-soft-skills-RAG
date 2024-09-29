@@ -102,18 +102,18 @@ def process_audio_file(file_url, token):
 
     # Convert audio to text using Azure Speech-to-Text
     transcribed_text = speech_to_text(file_path)
-    logger.info(f"Transcribed text: {transcribed_text}")
-    return transcribed_text
+    if transcribed_text:
+        logger.info(f"Transcribed Text: {transcribed_text}")
+        return transcribed_text
+    else:
+        logger.error("Failed to transcribe the audio.")
+        return None
 
 # Generate a response using Azure OpenAI's GPT model (GPT-3.5)
 def generate_response(user_input):
     try:
         response = openai_client.chat.completions.create(
-<<<<<<< HEAD
             model="gpt-35-turbo",  # Ensure this matches the deployment name in Azure for GPT-3.5
-=======
-            model="gpt-35-turbo",  # Ensure this matches the deployment name in Azure
->>>>>>> 28ebef9a1d6e343ddecde3450b5c4c1924cdd13c
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input}
