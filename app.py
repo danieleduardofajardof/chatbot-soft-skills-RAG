@@ -59,16 +59,22 @@ slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 
 # Azure Speech to Text using AZURE_SPEECH_API_KEY
 def speech_to_text(file_path):
-    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))  # Use AZURE_SPEECH_API_KEY for speech services
+    speech_config = speechsdk.SpeechConfig(subscription=os.getenv("AZURE_SPEECH_API_KEY"), region=os.getenv("AZURE_REGION"))
     audio_config = speechsdk.audio.AudioConfig(filename=file_path)
     recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
     
     result = recognizer.recognize_once()
     if result.reason == speechsdk.ResultReason.RecognizedSpeech:
+        logger.info(f"Speech recognized: {result.text}")
         return result.text
-    else:
-        logger.error("Speech recognition failed or no speech detected.")
-        return None
+    elif result.reason == speechsdk.ResultReason.NoMatch:
+        logger.error("No speech could be recognized.")
+    elif result.reason == speechsdk.ResultReason.Canceled:
+        cancellation_details = result.cancellation_details
+        logger.error(f"Speech Recognition canceled: {cancellation_details.reason}")
+        if cancellation_details.reason == speechsdk.CancellationReason.Error:
+            logger.error(f"Error details: {cancellation_details.error_details}")
+    return None
 
 # Azure Text to Speech using AZURE_SPEECH_API_KEY
 def text_to_speech(response_text):
