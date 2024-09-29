@@ -15,7 +15,7 @@ spec:
       securityContext:
         runAsUser: 0            # Run all containers as this user
         runAsGroup: 0           # Run all containers in this group
-        fsGroup: 1000               # File system group for the pod
+        fsGroup: 0              # File system group for the pod
         seccompProfile:
           type: RuntimeDefault 
       containers:

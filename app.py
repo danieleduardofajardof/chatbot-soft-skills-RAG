@@ -115,7 +115,7 @@ def process_audio_file(file_url, token):
         "Authorization": f"Bearer {token}"
     }
     response = requests.get(file_url, headers=headers)
-    file_path = "/app/received_audio.m4a"
+    file_path = "/tmp/received_audio.m4a"
     # Check /app directory permissions before writing
     try:
         app_dir_stat = os.stat("/app")
@@ -130,7 +130,7 @@ def process_audio_file(file_url, token):
             logger.error(f"File {file_path} not found after download.")
             return None
         # Convert .m4a to .wav
-        wav_file_path = "/app/converted_audio.wav"
+        wav_file_path = "/tmp/converted_audio.wav"
         convert_m4a_to_wav(file_path, wav_file_path)
 
         # Convert audio to text using Azure Speech-to-Text on the WAV file
