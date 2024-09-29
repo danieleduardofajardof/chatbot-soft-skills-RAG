@@ -2,7 +2,7 @@ fastapi
 uvicorn
 slack_sdk
 pymongo
-azure-cognitiveservices-speech==1.40.0
+azure-cognitiveservices-speech
 openai
 pydub
 azure-storage-blob
