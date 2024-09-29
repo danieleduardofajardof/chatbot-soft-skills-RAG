@@ -119,7 +119,7 @@ docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/soft
 
    Create a Kubernetes deployment and service YAML file:
 
-   ```yaml
+  ```yaml
   apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -134,6 +134,12 @@ docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/soft
         labels:
           app: soft-skills-chatbot
       spec:
+        securityContext:
+          runAsUser: 0            # Run all containers as this user
+          runAsGroup: 0           # Run all containers in this group
+          fsGroup: 0              # File system group for the pod
+          seccompProfile:
+            type: RuntimeDefault 
         containers:
         - name: soft-skills-chatbot
           image: softskillsregistry.azurecr.io/softskillsbot:latest
@@ -150,18 +156,22 @@ docker buildx build --platform linux/arm64 -t softskillsregistry.azurecr.io/soft
               secretKeyRef:
                 name: softskills-secrets
                 key: COSMOS_DB_CONNECTION_STRING
-  ---
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: soft-skills-chatbot
-  spec:
-    type: LoadBalancer
-    ports:
-    - port: 80
-      targetPort: 80
-    selector:
-      app: soft-skills-chatbot
+          - name: AZURE_OPENAI_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: softskills-secrets
+                key: AZURE_OPENAI_API_KEY
+          - name: AZURE_OPENAI_ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                name: softskills-secrets
+                key: AZURE_OPENAI_ENDPOINT
+          - name: AZURE_REGION
+            valueFrom:
+              secretKeyRef:
+                name: softskills-secrets
+                key: AZURE_REGION
+
 
    ```
   Create a network-policy.yaml for the cluster:
@@ -281,6 +291,19 @@ git commit -m "Some comments..."
 git push
 ```
 In order to avoid login everytime, add your SSH to the repo configuration for SSH Authentication.
+
+## Step 9: Inspect logs and run commands inside AKS
+```bash
+kubectl logs $(kubectl get pods --selector=app=soft-skills-chatbot -o jsonpath="{.items[0].metadata.name}")
+kubectl exec -it $(kubectl get pods --selector=app=soft-skills-chatbot -o jsonpath="{.items[0].metadata.name}") -- /bin/sh
+```
+
+
+
+
+
+
+
 ## Implementation Details
 
 The chatbot utilizes a RAG approach, retrieving relevant information from stored conversations to enhance its responses. Key functionalities include:
