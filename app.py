@@ -11,24 +11,6 @@ import azure.cognitiveservices.speech as speechsdk
 import requests
 from openai import AzureOpenAI
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-
-# Initialize Azure Blob Storage client
-blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
-container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
-container_client = blob_service_client.get_container_client(container_name)
-
-# Ensure the container exists
-try:
-    container_client.create_container()
-except Exception as e:
-    logger.info(f"Container already exists: {str(e)}")
-
-
-# MongoDB connection for logging
-mongo_client = MongoClient(os.getenv("COSMOS_DB_CONNECTION_STRING"))
-db = mongo_client['soft_skills_chatbot']
-logs_collection = db['logs']
-
 # Custom logging handler to store logs in CosmosDB
 class CosmosDBHandler(logging.Handler):
     def emit(self, record):
@@ -46,6 +28,39 @@ class CosmosDBHandler(logging.Handler):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.addHandler(CosmosDBHandler())  # Add custom handler to store logs in CosmosDB
+
+# MongoDB connection for logging
+mongo_client = MongoClient(os.getenv("COSMOS_DB_CONNECTION_STRING"))
+db = mongo_client['soft_skills_chatbot']
+logs_collection = db['logs']
+
+
+logger.info(f"AZURE_STORAGE_CONNECTION_STRING exists: {bool(os.getenv('AZURE_STORAGE_CONNECTION_STRING'))}")
+logger.info(f"AZURE_STORAGE_CONTAINER_NAME exists: {bool(os.getenv('AZURE_STORAGE_CONTAINER_NAME'))}")
+
+
+try:
+    blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
+    logger.info("Successfully connected to Azure Blob Storage")
+except Exception as e:
+    logger.error(f"Failed to connect to Azure Blob Storage: {str(e)}")
+
+
+container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
+container_client = blob_service_client.get_container_client(container_name)
+
+# Ensure the container exists
+try:
+    container_client.create_container()
+except Exception as e:
+    logger.info(f"Container already exists: {str(e)}")
+
+
+# MongoDB connection for logging
+mongo_client = MongoClient(os.getenv("COSMOS_DB_CONNECTION_STRING"))
+db = mongo_client['soft_skills_chatbot']
+logs_collection = db['logs']
+
 
 # Log environment variables for debugging (only log that they exist, no values)
 logger.info(f"AZURE_OPENAI_API_KEY exists: {bool(os.getenv('AZURE_OPENAI_API_KEY'))}")
