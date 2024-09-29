@@ -1,17 +1,23 @@
 #!/usr/bin/env python
 import os
 import logging
+from datetime import datetime
+
+import ffmpeg
+from pydub import AudioSegment
+from moviepy.editor import AudioFileClip
+import requests
+
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from pymongo import MongoClient
-from datetime import datetime
-from fastapi.responses import JSONResponse
+
 import azure.cognitiveservices.speech as speechsdk
-import requests
 from openai import AzureOpenAI
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-from pydub import AudioSegment
+
 
 # Custom logging handler to store logs in CosmosDB
 class CosmosDBHandler(logging.Handler):
@@ -154,9 +160,6 @@ def text_to_speech(response_text: str) -> str:
     else:
         logger.error("Failed to upload response audio to Blob Storage")
         return None
-from pydub import AudioSegment
-from moviepy.editor import AudioFileClip
-import ffmpeg
 
 def convert_to_wav(input_file_path: str, output_file_path: str, file_type: str) -> str:
     """
