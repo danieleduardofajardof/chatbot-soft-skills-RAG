@@ -341,6 +341,7 @@ async def slack_events(req: Request) -> JSONResponse:
                     
         # Handle text message events
         if event.get('type') == 'message' and 'subtype' not in event:
+            print("Processing text message")
             logger.info("Processing text message")
             user_input = event.get('text', '').strip()
             user_id = event.get('user', '')
@@ -354,7 +355,8 @@ async def slack_events(req: Request) -> JSONResponse:
                 bot_response = generate_response(user_input)
                 log_conversation(user_id, user_input, bot_response)
                 send_response_to_slack(channel, bot_response)
-        else:
+        elif 'files' in event:
+            print("Files found in the event")
             logger.info("Files found in the event")
             for file in event.get('files'):
                 logger.info(f"File received: {file}")

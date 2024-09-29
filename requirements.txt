@@ -1,8 +1,9 @@
-fastapi==0.115.0
-uvicorn==0.31.0
-slack_sdk==3.33.1
-pymongo==4.9.1
 azure-cognitiveservices-speech==1.40.0
-openai==1.50.2
-pydub==0.25.1
+azure-core==1.31.0
 azure-storage-blob==12.23.1
+fastapi==0.115.0
+openai==1.50.2
+pymongo==4.9.1
+pydub==0.25.1
+slack_sdk==3.33.1
+uvicorn==0.31.0
