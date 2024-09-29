@@ -9,7 +9,7 @@ spec:
       app: soft-skills-chatbot
   template:
     metadata:
-      labels:a
+      labels:
         app: soft-skills-chatbot
     spec:
       securityContext:
