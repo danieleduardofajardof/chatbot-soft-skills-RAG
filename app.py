@@ -154,21 +154,39 @@ def text_to_speech(response_text: str) -> str:
     else:
         logger.error("Failed to upload response audio to Blob Storage")
         return None
+from pydub import AudioSegment
+from moviepy.editor import AudioFileClip
+import ffmpeg
 
-def convert_m4a_to_wav(input_file_path: str, output_file_path: str) -> None:
+def convert_to_wav(input_file_path: str, output_file_path: str, file_type: str) -> str:
     """
-    Converts an M4A audio file to WAV format.
+    Converts an audio/video file to WAV format.
     
     Parameters:
-    - input_file_path: str - The path to the input M4A file.
+    - input_file_path: str - The path to the input file.
     - output_file_path: str - The path to save the converted WAV file.
+    - file_type: str - The type of file (e.g., 'm4a', 'mp4', 'webm').
     
     Returns:
-    - None
+    - str: The path to the converted WAV file.
     """
-    audio = AudioSegment.from_file(input_file_path, format="m4a")
-    audio.export(output_file_path, format="wav")
-    logger.info(f"Converted {input_file_path} to {output_file_path}")
+    try:
+        if file_type == 'm4a':
+            audio = AudioSegment.from_file(input_file_path, format="m4a")
+            audio.export(output_file_path, format="wav")
+        elif file_type in ['mp4', 'webm']:
+            # Extract audio from video and convert to WAV
+            with AudioFileClip(input_file_path) as audio_clip:
+                audio_clip.write_audiofile(output_file_path, codec='pcm_s16le')
+        else:
+            logger.error(f"Unsupported file type: {file_type}")
+            return None
+        
+        logger.info(f"Converted {input_file_path} to WAV: {output_file_path}")
+        return output_file_path
+    except Exception as e:
+        logger.error(f"Failed to convert {input_file_path} to WAV: {str(e)}")
+        return None
 
 def upload_to_blob(file_path: str, blob_name: str) -> str:
     """
@@ -190,7 +208,6 @@ def upload_to_blob(file_path: str, blob_name: str) -> str:
     except Exception as e:
         logger.error(f"Failed to upload {file_path} to Blob Storage: {str(e)}")
         return None
-
 def process_audio_file(file_url: str, token: str) -> str:
     """
     Processes an audio file from Slack: downloads, uploads to Blob, converts to WAV, and transcribes.
@@ -205,30 +222,41 @@ def process_audio_file(file_url: str, token: str) -> str:
     headers = {
         "Authorization": f"Bearer {token}"
     }
+
+    # Determine the file extension for processing
+    file_extension = file_url.split('.')[-1]  # Get the file extension from the URL
     
+    if file_extension not in ['m4a', 'mp4', 'webm']:
+        logger.error(f"Unsupported file type: {file_extension}")
+        return None
+
     try:
         response = requests.get(file_url, headers=headers, stream=True)
         if response.status_code == 200:
             logger.info(f"File download from Slack successful. Status code: {response.status_code}")
 
-            # Upload the .m4a file to Blob Storage directly
-            blob_name_m4a = "received_audio.m4a"
-            blob_client = container_client.get_blob_client(blob_name_m4a)
-            blob_client.upload_blob(response.raw, overwrite=True)
-            logger.info(f".m4a file uploaded directly to Blob Storage: {blob_client.url}")
+            # Save the file locally for conversion
+            input_file_path = f"/tmp/input_audio.{file_extension}"
+            with open(input_file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            # Convert the audio/video to WAV format
+            output_file_path = "/tmp/converted_audio.wav"
+            wav_file = convert_to_wav(input_file_path, output_file_path, file_extension)
 
-            # Process the .m4a file and convert to .wav in memory
-            audio_data = AudioSegment.from_file(response.raw, format="m4a")
-            wav_file_buffer = audio_data.export(format="wav")
+            if not wav_file:
+                return None
             
-            # Upload the .wav file to Blob Storage directly
-            blob_name_wav = "converted_audio.wav"
-            blob_client_wav = container_client.get_blob_client(blob_name_wav)
-            blob_client_wav.upload_blob(wav_file_buffer, overwrite=True)
-            logger.info(f".wav file uploaded directly to Blob Storage: {blob_client_wav.url}")
-            
+            # Upload the converted .wav file to Blob Storage
+            blob_name = "converted_audio.wav"
+            blob_client = container_client.get_blob_client(blob_name)
+            with open(wav_file, "rb") as data:
+                blob_client.upload_blob(data, overwrite=True)
+            logger.info(f".wav file uploaded to Blob Storage: {blob_client.url}")
+
             # Transcribe the .wav file using Azure Speech-to-Text
-            transcribed_text = speech_to_text(blob_client_wav.url)
+            transcribed_text = speech_to_text(blob_client.url)
             if transcribed_text:
                 logger.info(f"Transcribed text: {transcribed_text}")
                 return transcribed_text
@@ -242,6 +270,7 @@ def process_audio_file(file_url: str, token: str) -> str:
     except Exception as e:
         logger.error(f"Failed to process audio file: {str(e)}")
         return None
+
 
 def generate_response(user_input: str) -> str:
     """
@@ -355,7 +384,7 @@ async def slack_events(req: Request) -> JSONResponse:
                 bot_response = generate_response(user_input)
                 log_conversation(user_id, user_input, bot_response)
                 send_response_to_slack(channel, bot_response)
-        elif 'files' in event:
+        else:
             print("Files found in the event")
             logger.info("Files found in the event")
             for file in event.get('files'):

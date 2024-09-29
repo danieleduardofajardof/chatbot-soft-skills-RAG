@@ -7,3 +7,5 @@ pymongo==4.9.1
 pydub==0.25.1
 slack_sdk==3.33.1
 uvicorn==0.31.0
+moviepy==1.0.3
+ffmpeg-python==0.2.0
