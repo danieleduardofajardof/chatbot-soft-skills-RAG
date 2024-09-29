@@ -13,7 +13,7 @@ spec:
         app: soft-skills-chatbot
     spec:
       securityContext:
-        runAsUser: 1000            # Run all containers as this user
+        runAsUser: 0            # Run all containers as this user
         runAsGroup: 3000            # Run all containers in this group
         fsGroup: 2000               # File system group for the pod
         seccompProfile:
