@@ -204,7 +204,8 @@ async def slack_events(req: Request):
         event = data['event']
 
         # Handle file share events
-        if event.get('filetype') == 'm4a' and 'files' in event:
+        if 'files' in event:
+            if event['files']['filetype']=='m4a':
             logger.info("Audio m4a received")
             for file in event.get('files'):
                 file_url = file.get('url_private')
