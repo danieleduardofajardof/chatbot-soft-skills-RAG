@@ -205,7 +205,9 @@ async def slack_events(req: Request):
 
         # Handle file share events
         if 'files' in event:
+            logger.info("Files found in the event")
             for file in event.get('files'):
+                logger.info(f"File received: {file}")
                 if file.get('filetype') == 'm4a':  # Corrected to check each file's type
                     logger.info("Audio m4a received")
                     file_url = file.get('url_private')
@@ -223,7 +225,7 @@ async def slack_events(req: Request):
 
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
-            logger.info("Text message received")
+            logger.info("Processing text message")
             user_input = event.get('text', '').strip()
             user_id = event.get('user', '')
             channel = event.get('channel', '')
