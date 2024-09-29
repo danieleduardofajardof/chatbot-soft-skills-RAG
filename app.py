@@ -143,6 +143,7 @@ def process_audio_file(file_url, token):
             return None
     except Exception as e:
         logger.error(f"Failed to write file {file_path}: {str(e)}")
+        return None
 
 # Generate a response using Azure OpenAI's GPT model (GPT-3.5)
 def generate_response(user_input):
@@ -203,7 +204,7 @@ async def slack_events(req: Request):
         event = data['event']
 
         # Handle file share events
-        if event.get('subtype') == 'file_share' and event.get('files'):
+        if event.get('filetype') == 'm4a' and event.get('files'):
             for file in event.get('files'):
                 file_url = file.get('url_private')
                 token = os.getenv("SLACK_BOT_TOKEN")
