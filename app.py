@@ -223,6 +223,7 @@ async def slack_events(req: Request):
 
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
+            logger.info("Text message received")
             user_input = event.get('text', '').strip()
             user_id = event.get('user', '')
             channel = event.get('channel', '')
