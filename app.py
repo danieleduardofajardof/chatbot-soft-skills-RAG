@@ -192,6 +192,34 @@ def upload_to_blob(file_path: str, blob_name: str) -> str:
         logger.error(f"Failed to upload {file_path} to Blob Storage: {str(e)}")
         return None
 
+def download_blob_to_local(blob_url: str, local_path: str) -> str:
+    """
+    Downloads the blob from Azure Blob Storage to a local path.
+    
+    Parameters:
+    - blob_url: str - The URL of the blob to be downloaded.
+    - local_path: str - The local path where the blob should be saved.
+
+    Returns:
+    - str: The local path where the blob was saved, or None if there was an error.
+    """
+    try:
+        # Extract the blob name from the URL
+        blob_name = blob_url.split("/")[-1]
+
+        # Create a blob client for the specific blob
+        blob_client = container_client.get_blob_client(blob_name)
+
+        # Download the blob content to the local file system
+        with open(local_path, "wb") as file:
+            blob_data = blob_client.download_blob().readall()
+            file.write(blob_data)
+
+        logger.info(f"Downloaded blob to local path: {local_path}")
+        return local_path
+    except Exception as e:
+        logger.error(f"Error downloading blob to local path: {e}")
+        return None
 
 def process_audio_file(file_url: str, token: str) -> str:
     """
@@ -240,13 +268,15 @@ def process_audio_file(file_url: str, token: str) -> str:
             logger.info(f".wav file uploaded directly to Blob Storage: {blob_client_wav.url}")
 
             # Transcribe the .wav file using Azure Speech-to-Text
-            transcribed_text = speech_to_text(blob_client_wav.url)
-            if transcribed_text:
-                logger.info(f"Transcribed text: {transcribed_text}")
-                return transcribed_text
+            local_wav_file = download_blob_to_local(blob_client_wav.url, "/tmp/converted_audio.wav")
+            if local_wav_file:
+                transcribed_text = speech_to_text(local_wav_file)
+                if transcribed_text:
+                    logger.info(f"Transcribed text: {transcribed_text}")
+                else:
+                    logger.error("Failed to transcribe audio")
             else:
-                logger.error("Failed to transcribe audio using Azure Speech-to-Text")
-                return None
+                logger.error("Failed to download and convert audio file")
         else:
             logger.error(f"Failed to download file from Slack. Status code: {response.status_code}")
             return None
