@@ -16,19 +16,29 @@ app = FastAPI()
 
 # In-memory dictionary to store user context (multi-turn conversation state)
 conversation_state = {}
-
-# Logger
+# Configure the root logger
 logging.basicConfig(
-    level=logging.INFO,  # Set the logging level (can be DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Specify log format
+    level=logging.DEBUG,  # Set the root level to DEBUG for detailed logging
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),  # Output logs to console
-        logging.FileHandler("app.log")  # Optionally, output logs to a file
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler("app.log")  # File output
     ]
 )
 
-# Example logger usage
+# Create a logger for your application
 logger = logging.getLogger(__name__)
+
+# Set logging level for specific libraries
+logging.getLogger("requests").setLevel(logging.DEBUG)  # Requests library
+logging.getLogger("slack_sdk").setLevel(logging.DEBUG)  # Slack SDK
+logging.getLogger("azure.storage.blob").setLevel(logging.DEBUG)  # Azure Blob SDK
+logging.getLogger("aiohttp").setLevel(logging.DEBUG)  # aiohttp library
+logging.getLogger("pydub").setLevel(logging.INFO)  # Pydub (set to INFO for less verbosity)
+logging.getLogger("openai").setLevel(logging.DEBUG)  # OpenAI Azure client
+
+# Example usage: logging an event in your application
+logger.info("Application started.")
 
 # Root health check endpoint
 @app.get("/")

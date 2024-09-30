@@ -14,18 +14,29 @@ blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_
 container_client = blob_service_client.get_container_client(os.getenv("AZURE_STORAGE_CONTAINER_NAME"))
 openai_client = AzureOpenAI(api_key=os.getenv("AZURE_OPENAI_API_KEY"), azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"))
 
-# Logger
+# Configure the root logger
 logging.basicConfig(
-    level=logging.INFO,  # Set the logging level (can be DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Specify log format
+    level=logging.DEBUG,  # Set the root level to DEBUG for detailed logging
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),  # Output logs to console
-        logging.FileHandler("app.log")  # Optionally, output logs to a file
+        logging.StreamHandler(),  # Console output
+        logging.FileHandler("app.log")  # File output
     ]
 )
 
-# Example logger usage
+# Create a logger for your application
 logger = logging.getLogger(__name__)
+
+# Set logging level for specific libraries
+logging.getLogger("requests").setLevel(logging.DEBUG)  # Requests library
+logging.getLogger("slack_sdk").setLevel(logging.DEBUG)  # Slack SDK
+logging.getLogger("azure.storage.blob").setLevel(logging.DEBUG)  # Azure Blob SDK
+logging.getLogger("aiohttp").setLevel(logging.DEBUG)  # aiohttp library
+logging.getLogger("pydub").setLevel(logging.INFO)  # Pydub (set to INFO for less verbosity)
+logging.getLogger("openai").setLevel(logging.DEBUG)  # OpenAI Azure client
+
+# Example usage: logging an event in your application
+logger.info("Application started.")
 def analyze_sentiment_gpt(user_input: str) -> str:
     """
     Analyzes sentiment using GPT-3.5 by asking it to classify the sentiment.
