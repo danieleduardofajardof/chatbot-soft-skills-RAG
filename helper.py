@@ -15,8 +15,17 @@ container_client = blob_service_client.get_container_client(os.getenv("AZURE_STO
 openai_client = AzureOpenAI(api_key=os.getenv("AZURE_OPENAI_API_KEY"), azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"))
 
 # Logger
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,  # Set the logging level (can be DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Specify log format
+    handlers=[
+        logging.StreamHandler(),  # Output logs to console
+        logging.FileHandler("app.log")  # Optionally, output logs to a file
+    ]
+)
 
+# Example logger usage
+logger = logging.getLogger(__name__)
 def analyze_sentiment_gpt(user_input: str) -> str:
     """
     Analyzes sentiment using GPT-3.5 by asking it to classify the sentiment.
