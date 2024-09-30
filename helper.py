@@ -6,7 +6,8 @@ from azure.storage.blob import BlobServiceClient
 from slack_sdk import WebClient
 from datetime import datetime
 from openai import AzureOpenAI
-
+import aiohttp
+from pydub import AudioSegment
 # Initialize clients
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
@@ -81,49 +82,57 @@ def generate_response(user_id: str, user_input: str, conversation_state: dict) -
     return bot_response
 
 # Process the audio file in memory
-def process_audio_file(file_url: str, token: str) -> str:
+async def process_audio_file(file_url: str, token: str) -> str:
+    """
+    Downloads, converts to WAV, uploads to Blob Storage asynchronously, and returns a transcription.
+    """
     headers = {"Authorization": f"Bearer {token}"}
     file_extension = file_url.split('.')[-1]
+
     if file_extension not in ['m4a', 'mp4', 'webm']:
         logger.error(f"Unsupported file type: {file_extension}")
         return None
 
     try:
-        response = requests.get(file_url, headers=headers, stream=True)
-        if response.status_code == 200:
-            file_in_memory = io.BytesIO()
-            for chunk in response.iter_content(chunk_size=8192):
-                file_in_memory.write(chunk)
-            file_in_memory.seek(0)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url, headers=headers) as response:
+                if response.status == 200:
+                    file_in_memory = io.BytesIO(await response.read())
+                    file_in_memory.seek(0)
 
-            wav_in_memory = io.BytesIO()
-            audio = AudioSegment.from_file(file_in_memory, format=file_extension)
-            audio.export(wav_in_memory, format="wav")
-            wav_in_memory.seek(0)
+                    wav_in_memory = io.BytesIO()
+                    audio = AudioSegment.from_file(file_in_memory, format=file_extension)
+                    audio.export(wav_in_memory, format="wav")
+                    wav_in_memory.seek(0)
 
-            blob_name = "converted_audio.wav"
-            blob_client = container_client.get_blob_client(blob_name)
-            blob_client.upload_blob(wav_in_memory, overwrite=True)
+                    blob_name = "converted_audio.wav"
+                    blob_client = container_client.get_blob_client(blob_name)
 
-            logger.info(f".wav file uploaded to Blob Storage: {blob_client.url}")
-            return "Dummy transcription"  # You can replace this with an actual transcription service
-        else:
-            logger.error(f"Failed to download file from Slack. Status code: {response.status_code}")
-            return None
+                    try:
+                        await blob_client.upload_blob(wav_in_memory, overwrite=True)
+                        logger.info(f".wav file uploaded to Blob Storage: {blob_client.url}")
+                    except Exception as e:
+                        logger.error(f"Error during upload to Blob Storage: {e}")
+                        return None
+
+                    return "Dummy transcription"
+                else:
+                    logger.error(f"Failed to download file from Slack. Status code: {response.status}")
+                    return None
     except Exception as e:
         logger.error(f"Error processing audio file: {e}")
         return None
 
-# Send a response back to Slack
-def send_response_to_slack(channel: str, response: str, file_path: str = None) -> None:
+async def send_response_to_slack(channel: str, response: str, file_path: str = None) -> None:
     try:
         if file_path:
-            slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
+            logger.info(f"Sending file response to Slack: {file_path}")
+            await slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
         else:
-            slack_client.chat_postMessage(channel=channel, text=response)
+            logger.info(f"Sending text response to Slack: {response}")
+            await slack_client.chat_postMessage(channel=channel, text=response)
     except Exception as e:
-        logger.error(f"Error sending message to Slack: {e}")
-
+        logger.error(f"Error sending message or file to Slack: {e}")
 # Log the conversation in a database
 def log_conversation(user_id: str, user_input: str, bot_response: str) -> None:
     log_entry = {

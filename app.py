@@ -8,7 +8,6 @@ from datetime import datetime
 from openai import AzureOpenAI
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-import logging
 from helper import generate_response, process_audio_file, send_response_to_slack, log_conversation
 
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))

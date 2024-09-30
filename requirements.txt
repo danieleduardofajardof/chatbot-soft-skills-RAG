@@ -1,3 +1,4 @@
+aiohttp==3.10.8
 azure-cognitiveservices-speech==1.40.0
 azure-core==1.31.0
 azure-storage-blob==12.23.1
