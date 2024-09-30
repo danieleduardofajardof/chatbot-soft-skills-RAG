@@ -547,8 +547,8 @@ async def slack_events(req: Request) -> JSONResponse:
         elif('files' in event.keys()):
             print("Files found in the event")
             logger.info("Files found in the event")
-            logger.info(f"File received: {event['files']['name']}")
-            file_url = event['files']['url_private']
+            logger.info(f"File received: {event['files'][0]['name']}")
+            file_url = event['files'][0]['url_private']
             token = os.getenv("SLACK_BOT_TOKEN")
             try:
                 transcribed_text = process_audio_file(file_url, token)
