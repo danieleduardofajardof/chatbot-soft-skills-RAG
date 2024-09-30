@@ -18,6 +18,16 @@ app = FastAPI()
 conversation_state = {}
 
 # Logger
+logging.basicConfig(
+    level=logging.INFO,  # Set the logging level (can be DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Specify log format
+    handlers=[
+        logging.StreamHandler(),  # Output logs to console
+        logging.FileHandler("app.log")  # Optionally, output logs to a file
+    ]
+)
+
+# Example logger usage
 logger = logging.getLogger(__name__)
 
 # Root health check endpoint
