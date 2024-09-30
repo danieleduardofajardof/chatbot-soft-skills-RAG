@@ -60,3 +60,13 @@ spec:
             secretKeyRef:
               name: softskills-secrets
               key: AZURE_STORAGE_CONTAINER_NAME
+        - name: AZURE_SPEECH_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_SPEECH_API_KEY
+        - name: AZURE_REGION
+          valueFrom:
+            secretKeyRef:
+              name: softskills-secrets
+              key: AZURE_REGION
