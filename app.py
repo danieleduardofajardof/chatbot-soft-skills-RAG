@@ -12,6 +12,7 @@ import requests
 from openai import AzureOpenAI
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from pydub import AudioSegment
+import io
 
 # Custom logging handler to store logs in CosmosDB
 class CosmosDBHandler(logging.Handler):
