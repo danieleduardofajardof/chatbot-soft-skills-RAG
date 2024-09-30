@@ -1,15 +1,52 @@
 # AI-Powered Soft Skills Coach Chatbot
 
+# AI-Powered Soft Skills Coach Chatbot
+
 ## Overview
 
-The AI-Powered Soft Skills Coach Chatbot is designed to assist users in developing their soft skills through interactive conversations. This project implements a Retrieval-Augmented Generation (RAG) system utilizing Azure services, Kubernetes for deployment, and OpenAI's models for natural language understanding and generation. The chatbot integrates with Slack for real-time communication and employs voice interaction capabilities, allowing users to interact via speech.
+The AI-Powered Soft Skills Coach Chatbot is designed to assist users in developing their soft skills through interactive, AI-driven conversations. This project leverages a combination of Retrieval-Augmented Generation (RAG) techniques, advanced sentiment analysis, and Azure services to provide a highly personalized and adaptive learning experience. The chatbot integrates with Slack for real-time communication and supports voice interaction, allowing users to interact via speech. Additionally, the chatbot is designed to run efficiently on Azure Kubernetes Service (AKS) for scalable deployment.
 
 ## Objectives
 
-- **RAG System Implementation**: Build a RAG system to enhance the chatbot's responses using a vector database for storing conversation history.
-- **Slack Integration**: Create a Slack bot that interacts with users and provides responses.
-- **Voice Interaction**: Implement Azure's speech-to-text and text-to-speech services for voice interaction.
-- **Deployment**: Deploy the chatbot on Azure Kubernetes Service (AKS).
+- **RAG System Implementation**: Build a Retrieval-Augmented Generation (RAG) system to improve the chatbot's responses by combining the power of generative models with a vector database that stores conversation history and relevant documents. This enables the chatbot to retrieve and generate more accurate and context-aware responses.
+  
+- **HyDE Technique**: Implement Hypothetical Document Embeddings (HyDE) to further enhance the chatbot’s understanding and response generation by synthesizing hypothetical documents from user inputs and matching them with similar content in the database.
+  
+- **Sentiment Analysis**: Integrate sentiment analysis using OpenAI's GPT-3.5 models to detect and interpret the emotional tone of user inputs. Based on the detected sentiment (positive, neutral, or negative), the chatbot adapts its responses to be more empathetic, encouraging, or supportive, providing a more human-like interaction experience.
+
+- **Slack Integration**: Deploy the chatbot as a Slack bot that interacts with users in real time, providing responses based on both text and audio inputs. The chatbot can engage in multi-turn conversations while maintaining context to provide meaningful and continuous dialogue.
+
+- **Voice Interaction**: Enable voice interaction by integrating Azure's Speech-to-Text and Text-to-Speech services. This allows users to communicate with the bot via voice commands, and the bot responds with synthesized voice output, making the interaction more dynamic and accessible.
+
+- **Deployment on AKS**: Ensure the chatbot is scalable and highly available by deploying it on Azure Kubernetes Service (AKS). This allows for efficient orchestration of containerized services and provides scalability to handle multiple user requests simultaneously.
+
+- **Azure Blob Storage**: The chatbot uses Azure Blob Storage to store and retrieve audio files processed during voice interactions. The audio files are stored in a secure, scalable cloud storage, enabling quick access and retrieval of media files during interactions.
+
+- **Cosmos DB**: A MongoDB-compatible Cosmos DB is used to store logs, user interactions, and conversation history. This allows for quick access and searchability of past interactions, enabling the chatbot to maintain context and improve future responses.
+
+- **GitHub Actions for CI/CD**: Continuous Integration and Continuous Deployment (CI/CD) is implemented using GitHub Actions. This ensures automated deployment, testing, and monitoring of the chatbot application whenever updates are pushed to the GitHub repository, keeping the system robust and up-to-date.
+
+## Key Features
+
+- **Retrieval-Augmented Generation (RAG)**: The chatbot enhances its responses by combining real-time generation with information retrieval from a knowledge base, improving the relevance and accuracy of responses.
+  
+- **HyDE Technique**: The chatbot utilizes Hypothetical Document Embeddings to generate more insightful responses by synthesizing potential document matches to user queries.
+
+- **Sentiment Analysis**: Using GPT-3.5, the chatbot can analyze the sentiment behind user messages, allowing it to provide more personalized and emotionally intelligent responses.
+
+- **Slack Bot**: The chatbot integrates seamlessly with Slack, offering both text-based and voice-based interaction through the Slack platform.
+
+- **Voice-to-Text and Text-to-Voice**: Leveraging Azure Cognitive Services, users can speak to the bot and receive voice responses, enhancing accessibility and user engagement.
+
+- **Azure Blob Storage**: Audio files generated during voice interactions are stored and managed using Azure Blob Storage for secure and scalable cloud-based storage.
+
+- **Cosmos DB**: The bot stores interaction logs and conversation history in Cosmos DB, enabling it to access previous conversations and maintain context.
+
+- **Azure Kubernetes Service (AKS) Deployment**: The chatbot is deployed on AKS, ensuring a scalable, secure, and robust environment for handling large volumes of interactions.
+
+- **GitHub Actions for CI/CD**: GitHub Actions automate the build, test, and deployment processes, ensuring smooth and continuous delivery of updates.
+
+This project combines cutting-edge AI technologies with robust deployment strategies to create an adaptive and responsive soft skills coach that can improve users' communication and interpersonal skills in real time.
 
 ## Technology Stack
 
@@ -18,6 +55,7 @@ The AI-Powered Soft Skills Coach Chatbot is designed to assist users in developi
 - **Database**: Azure Cosmos DB (MongoDB API)
 - **Containerization**: Docker
 - **Orchestration**: Azure Kubernetes Service (AKS)
+- **Storage**: Azure Blob Storage Service
 - **Speech Services**: Azure Cognitive Services for Speech
 - **Messaging Platform**: Slack API
 - **Programming Language**: Python
