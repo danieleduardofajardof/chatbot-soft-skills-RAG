@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import io
 import os
 import logging
 from datetime import datetime
@@ -354,9 +355,10 @@ def upload_to_blob(file_path: str, blob_name: str) -> str:
     except Exception as e:
         logger.error(f"Failed to upload {file_path} to Blob Storage: {str(e)}")
         return None
+
 def process_audio_file(file_url: str, token: str) -> str:
     """
-    Processes an audio file from Slack: downloads, uploads to Blob, converts to WAV, and transcribes.
+    Processes an audio file from Slack: downloads, uploads to Blob, converts to WAV, and transcribes in memory.
     
     Parameters:
     - file_url: str - The URL of the audio file to be processed.
@@ -377,28 +379,27 @@ def process_audio_file(file_url: str, token: str) -> str:
         return None
 
     try:
+        # Download the file from Slack
         response = requests.get(file_url, headers=headers, stream=True)
         if response.status_code == 200:
             logger.info(f"File download from Slack successful. Status code: {response.status_code}")
 
-            # Save the file locally for conversion
-            input_file_path = f"/tmp/input_audio.{file_extension}"
-            with open(input_file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            # Convert the audio/video to WAV format
-            output_file_path = "/tmp/converted_audio.wav"
-            wav_file = convert_to_wav(input_file_path, output_file_path, file_extension)
+            # Read the file content into memory (BytesIO)
+            file_in_memory = io.BytesIO()
+            for chunk in response.iter_content(chunk_size=8192):
+                file_in_memory.write(chunk)
+            file_in_memory.seek(0)  # Reset the buffer to the beginning
 
-            if not wav_file:
-                return None
-            
-            # Upload the converted .wav file to Blob Storage
+            # Convert the audio to WAV format in memory
+            wav_in_memory = io.BytesIO()
+            audio = AudioSegment.from_file(file_in_memory, format=file_extension)
+            audio.export(wav_in_memory, format="wav")
+            wav_in_memory.seek(0)
+
+            # Upload the converted .wav file to Blob Storage from memory
             blob_name = "converted_audio.wav"
             blob_client = container_client.get_blob_client(blob_name)
-            with open(wav_file, "rb") as data:
-                blob_client.upload_blob(data, overwrite=True)
+            blob_client.upload_blob(wav_in_memory, overwrite=True)
             logger.info(f".wav file uploaded to Blob Storage: {blob_client.url}")
 
             # Transcribe the .wav file using Azure Speech-to-Text
