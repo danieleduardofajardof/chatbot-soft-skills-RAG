@@ -324,14 +324,22 @@ def send_response_to_slack(channel: str, response: str, file_path: str = None) -
     - channel: str - The Slack channel where the response should be sent.
     - response: str - The response text to be sent.
     - file_path: str, optional - The path to an audio file to be uploaded (default is None).
-
+    
     Returns:
     - None
     """
     try:
         if file_path:
-            logger.info(f"Uploading audio response to Slack: {file_path}")
-            slack_client.files_upload(channels=channel, file=file_path, title="Response Audio")
+            # Download the file from Azure Blob Storage to a local path
+            local_audio_file = download_blob_to_local(file_path, "/tmp/response_audio.wav")
+            
+            # Ensure the file was successfully downloaded
+            if local_audio_file:
+                logger.info(f"Uploading audio response to Slack: {local_audio_file}")
+                with open(local_audio_file, "rb") as audio_file:
+                    slack_client.files_upload(channels=channel, file=audio_file, title="Response Audio")
+            else:
+                logger.error("Failed to download audio file for Slack upload.")
         else:
             slack_client.chat_postMessage(channel=channel, text=response)
     except SlackApiError as e:
@@ -358,6 +366,42 @@ def log_conversation(user_id: str, user_input: str, bot_response: str) -> None:
         "bot_response": bot_response
     }
     logs_collection.insert_one(log_entry)
+    
+def generate_response_with_rag(user_input: str) -> str:
+    # Retrieve relevant information from the database
+    retrieved_info = retrieve_documents(user_input)
+    
+    # Combine the user input with the retrieved information
+    combined_input = f"User Query: {user_input}\n\nRelevant Info: {retrieved_info}"
+    
+    # Call the OpenAI model with the combined input
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-35-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": combined_input}
+            ],
+            max_tokens=150,
+            n=1,
+            stop=None,
+            temperature=0.7
+        )
+        bot_response = response.choices[0].message.content.strip()
+        logger.info(f"Generated bot response: {bot_response}")
+        return bot_response
+    except Exception as e:
+        logger.error(f"Error generating response from Azure OpenAI: {e}")
+        return "I'm sorry, I'm having trouble generating a response right now."
+
+def retrieve_documents(query: str) -> str:
+    # Query your MongoDB for relevant documents
+    documents = db['knowledge_base'].find({"$text": {"$search": query}})
+    if documents:
+        # Concatenate relevant text from documents
+        return " ".join([doc['content'] for doc in documents])
+    return ""
+
 
 @app.post('/slack/events')
 async def slack_events(req: Request) -> JSONResponse:
@@ -395,9 +439,10 @@ async def slack_events(req: Request) -> JSONResponse:
             bot_user_id = auth_response['user_id']
 
             if user_input and user_id and channel and user_id != bot_user_id:
-                bot_response = generate_response(user_input)
+                bot_response = generate_response_with_rag(user_input)
                 log_conversation(user_id, user_input, bot_response)
                 send_response_to_slack(channel, bot_response)
+
         elif 'files' in event:
             logger.info("Files found in the event")
             for file in event.get('files'):
