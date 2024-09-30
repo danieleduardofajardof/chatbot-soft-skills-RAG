@@ -31,4 +31,4 @@ RUN pip install azure-storage-blob==12.23.1
 COPY . .
 
 # Command to run the application
-CMD ["/usr/local/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["/usr/local/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80","--log-level","debug"]
