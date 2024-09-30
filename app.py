@@ -273,6 +273,7 @@ def process_audio_file(file_url: str, token: str) -> str:
                 transcribed_text = speech_to_text(local_wav_file)
                 if transcribed_text:
                     logger.info(f"Transcribed text: {transcribed_text}")
+                    return transcribed_text
                 else:
                     logger.error("Failed to transcribe audio")
             else:
