@@ -417,11 +417,13 @@ def retrieve_documents(user_input: str):
         return "An error occurred while retrieving documents."
 
 
+# Initialize a set to keep track of processed events
+processed_event_ids = set()
+
 @app.post('/slack/events')
 async def slack_events(req: Request) -> JSONResponse:
     """
     Slack event handler to process events such as messages or file shares.
-
     Parameters:
     - req: Request - The incoming request object from Slack containing the event data.
     
@@ -437,10 +439,16 @@ async def slack_events(req: Request) -> JSONResponse:
 
     if 'event' in data:
         event = data['event']
+        event_id = data.get('event_id')
 
-        # Handle file share events
+        # Deduplication: Skip if event has already been processed
+        if event_id in processed_event_ids:
+            logger.info(f"Event {event_id} already processed, skipping.")
+            return JSONResponse(status_code=200, content={"status": "skipped"})
         
-                    
+        # Add event to the processed set to avoid reprocessing
+        processed_event_ids.add(event_id)
+
         # Handle text message events
         if event.get('type') == 'message' and 'subtype' not in event:
             logger.info("Processing text message")
@@ -457,8 +465,8 @@ async def slack_events(req: Request) -> JSONResponse:
                 log_conversation(user_id, user_input, bot_response)
                 send_response_to_slack(channel, bot_response)
 
+        # Handle file share events
         elif 'files' in event:
-            logger.info("Files found in the event")
             logger.info("Files found in the event")
             file = event.get('files')[0]
             user_id = event.get('user', '')
@@ -492,6 +500,7 @@ async def slack_events(req: Request) -> JSONResponse:
                     logger.error(f"Failed to process audio file: {str(e)}")
 
     return JSONResponse(status_code=200, content={"status": "success"})
+
 @app.get("/healthz")
 async def healthz() -> dict:
     """
