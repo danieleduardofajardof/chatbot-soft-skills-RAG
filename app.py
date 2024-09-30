@@ -16,6 +16,7 @@ app = FastAPI()
 
 # In-memory dictionary to store user context (multi-turn conversation state)
 conversation_state = {}
+
 # Configure the root logger
 logging.basicConfig(
     level=logging.DEBUG,  # Set the root level to DEBUG for detailed logging
@@ -68,16 +69,16 @@ async def slack_events(req: Request) -> JSONResponse:
             logger.info("Files found in the event")
             file_url = event['files'][0]['url_private']
             token = os.getenv("SLACK_BOT_TOKEN")
-            transcribed_text = process_audio_file(file_url, token)
+            transcribed_text = await process_audio_file(file_url, token)  # Ensure async processing if required
             user_id = event.get('user', '')
             channel = event.get('channel', '')
             
             if transcribed_text:
-                bot_response = generate_response(user_id, transcribed_text, conversation_state)
-                send_response_to_slack(channel, bot_response)
-                log_conversation(user_id, transcribed_text, bot_response)
+                bot_response = await generate_response(user_id, transcribed_text, conversation_state)  # Ensure async if needed
+                await send_response_to_slack(channel, bot_response)  # Ensure async if needed
+                await log_conversation(user_id, transcribed_text, bot_response)  # Ensure async if needed
             else:
-                send_response_to_slack(channel, "Sorry, I couldn't understand the audio.")
+                await send_response_to_slack(channel, "Sorry, I couldn't understand the audio.")  # Ensure async
 
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
@@ -92,8 +93,8 @@ async def slack_events(req: Request) -> JSONResponse:
 
             if user_input and user_id and channel and user_id != bot_user_id:
                 # Generate a response based on conversation context
-                bot_response = generate_response(user_id, user_input, conversation_state)
-                log_conversation(user_id, user_input, bot_response)
-                send_response_to_slack(channel, bot_response)
+                bot_response = await generate_response(user_id, user_input, conversation_state)  # Ensure async
+                await log_conversation(user_id, user_input, bot_response)  # Ensure async
+                await send_response_to_slack(channel, bot_response)  # Ensure async
 
     return JSONResponse(status_code=200, content={"status": "success"})
