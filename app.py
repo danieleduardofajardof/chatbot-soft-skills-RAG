@@ -1,8 +1,17 @@
+import os
+import io
+import logging
+import requests
+from azure.storage.blob import BlobServiceClient
+from slack_sdk import WebClient
+from datetime import datetime
+from openai import AzureOpenAI
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import logging
 from helper import generate_response, process_audio_file, send_response_to_slack, log_conversation
 
+slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 # Initialize FastAPI app
 app = FastAPI()
 

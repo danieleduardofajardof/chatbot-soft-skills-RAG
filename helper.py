@@ -1,34 +1,81 @@
-import io
 import os
+import io
 import logging
 import requests
-from pydub import AudioSegment
 from azure.storage.blob import BlobServiceClient
 from slack_sdk import WebClient
 from datetime import datetime
+from openai import AzureOpenAI
 
 # Initialize clients
 slack_client = WebClient(token=os.getenv("SLACK_BOT_TOKEN"))
 blob_service_client = BlobServiceClient.from_connection_string(os.getenv("AZURE_STORAGE_CONNECTION_STRING"))
 container_client = blob_service_client.get_container_client(os.getenv("AZURE_STORAGE_CONTAINER_NAME"))
+openai_client = AzureOpenAI(api_key=os.getenv("AZURE_OPENAI_API_KEY"), azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"))
 
 # Logger
 logger = logging.getLogger(__name__)
 
-# Generate response with basic multi-turn conversation handling
+def analyze_sentiment_gpt(user_input: str) -> str:
+    """
+    Analyzes sentiment using GPT-3.5 by asking it to classify the sentiment.
+
+    Parameters:
+    - user_input: str - The input text from the user.
+
+    Returns:
+    - str: "positive", "neutral", or "negative" sentiment classification.
+    """
+    try:
+        prompt = f"Please classify the sentiment of the following text as 'positive', 'neutral', or 'negative':\n\n{user_input}"
+        response = openai_client.chat.completions.create(
+            model="gpt-35-turbo",
+            messages=[
+                {"role": "system", "content": "You are an assistant that analyzes sentiment."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=50,
+            temperature=0
+        )
+
+        sentiment = response.choices[0].message.content.strip().lower()
+        logger.info(f"GPT-3.5 sentiment analysis result: {sentiment}")
+
+        if sentiment in ["positive", "neutral", "negative"]:
+            return sentiment
+        else:
+            return "neutral"  # Default to neutral if GPT-3.5 gives an unexpected response
+
+    except Exception as e:
+        logger.error(f"Error during GPT-3.5 sentiment analysis: {e}")
+        return "neutral"  # Default to neutral if there's an error
+
 def generate_response(user_id: str, user_input: str, conversation_state: dict) -> str:
     """
-    Generates a response and tracks conversation context for multi-turn conversations.
+    Generates a response with sentiment analysis using GPT-3.5.
     """
+    # Analyze sentiment using GPT-3.5
+    sentiment = analyze_sentiment_gpt(user_input)
+    
     # Check if the user has an ongoing conversation
     last_question = conversation_state.get(user_id, {}).get("last_question")
 
+    # Adjust response based on sentiment and context
     if last_question == "ask_for_name":
-        bot_response = f"Nice to meet you, {user_input}!"
+        if sentiment == "negative":
+            bot_response = f"I'm sorry if you're feeling down, {user_input}. I'm here if you want to talk!"
+        elif sentiment == "positive":
+            bot_response = f"Great to meet you, {user_input}!"
+        else:
+            bot_response = f"Nice to meet you, {user_input}."
         conversation_state[user_id] = {"last_question": None}  # Clear context
     else:
-        # First interaction or new context
-        bot_response = "Hello! What is your name?"
+        if sentiment == "negative":
+            bot_response = "Hello! It sounds like something might be bothering you. Would you like to share more?"
+        elif sentiment == "positive":
+            bot_response = "Hello! It's great to hear from you! What can I help you with today?"
+        else:
+            bot_response = "Hello! What is your name?"
         conversation_state[user_id] = {"last_question": "ask_for_name"}
 
     return bot_response
@@ -59,12 +106,9 @@ def process_audio_file(file_url: str, token: str) -> str:
             blob_client.upload_blob(wav_in_memory, overwrite=True)
 
             logger.info(f".wav file uploaded to Blob Storage: {blob_client.url}")
-
-            # Transcribe the .wav file (use an actual transcription service like Azure)
-            transcribed_text = "Dummy transcription text"
-            return transcribed_text
+            return "Dummy transcription"  # You can replace this with an actual transcription service
         else:
-            logger.error(f"Failed to download file. Status code: {response.status_code}")
+            logger.error(f"Failed to download file from Slack. Status code: {response.status_code}")
             return None
     except Exception as e:
         logger.error(f"Error processing audio file: {e}")
