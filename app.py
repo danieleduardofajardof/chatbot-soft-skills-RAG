@@ -191,6 +191,7 @@ def upload_to_blob(file_path: str, blob_name: str) -> str:
         logger.error(f"Failed to upload {file_path} to Blob Storage: {str(e)}")
         return None
 
+
 def process_audio_file(file_url: str, token: str) -> str:
     """
     Processes an audio file from Slack: downloads, uploads to Blob, converts to WAV, and transcribes.
@@ -207,26 +208,36 @@ def process_audio_file(file_url: str, token: str) -> str:
     }
     
     try:
+        logger.info(f"Downloading file from Slack URL: {file_url}")
         response = requests.get(file_url, headers=headers, stream=True)
         if response.status_code == 200:
             logger.info(f"File download from Slack successful. Status code: {response.status_code}")
 
+            # Save the raw response content to a BytesIO object
+            file_in_memory = io.BytesIO(response.content)
+            file_in_memory.seek(0)  # Reset pointer to the start of the file
+
             # Upload the .m4a file to Blob Storage directly
             blob_name_m4a = "received_audio.m4a"
             blob_client = container_client.get_blob_client(blob_name_m4a)
-            blob_client.upload_blob(response.raw, overwrite=True)
+            blob_client.upload_blob(file_in_memory, overwrite=True)
             logger.info(f".m4a file uploaded directly to Blob Storage: {blob_client.url}")
 
-            # Process the .m4a file and convert to .wav in memory
-            audio_data = AudioSegment.from_file(response.raw, format="m4a")
-            wav_file_buffer = audio_data.export(format="wav")
-            
-            # Upload the .wav file to Blob Storage directly
+            # Reset the file pointer again before converting
+            file_in_memory.seek(0)
+
+            # Convert the .m4a file to .wav in memory using pydub
+            audio_data = AudioSegment.from_file(file_in_memory, format="m4a")
+            wav_file_buffer = io.BytesIO()
+            audio_data.export(wav_file_buffer, format="wav")
+            wav_file_buffer.seek(0)  # Reset pointer to the start of the WAV file
+
+            # Upload the .wav file to Blob Storage
             blob_name_wav = "converted_audio.wav"
             blob_client_wav = container_client.get_blob_client(blob_name_wav)
             blob_client_wav.upload_blob(wav_file_buffer, overwrite=True)
             logger.info(f".wav file uploaded directly to Blob Storage: {blob_client_wav.url}")
-            
+
             # Transcribe the .wav file using Azure Speech-to-Text
             transcribed_text = speech_to_text(blob_client_wav.url)
             if transcribed_text:
@@ -242,6 +253,7 @@ def process_audio_file(file_url: str, token: str) -> str:
     except Exception as e:
         logger.error(f"Failed to process audio file: {str(e)}")
         return None
+
 
 def generate_response(user_input: str) -> str:
     """
