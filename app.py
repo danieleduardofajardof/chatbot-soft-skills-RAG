@@ -459,18 +459,25 @@ async def slack_events(req: Request) -> JSONResponse:
 
         elif 'files' in event:
             logger.info("Files found in the event")
-            for file in event.get('files'):
-                user_id = event.get('user', '')
-                auth_response = slack_client.auth_test()
-                bot_user_id = auth_response['user_id']
-                if user_id == bot_user_id:
-                    logger.info("Skipping file event from the bot itself.")
-                    return JSONResponse(status_code=200, content={"status": "skipped"})
-                
+            logger.info("Files found in the event")
+            file = event.get('files')[0]
+            user_id = event.get('user', '')
+
+            # Get the bot's user ID to prevent it from processing its own files
+            auth_response = slack_client.auth_test()
+            bot_user_id = auth_response['user_id']
+
+            # Skip processing if the file was uploaded by the bot itself
+            if user_id == bot_user_id:
+                logger.info("Skipping file event from the bot itself.")
+                return JSONResponse(status_code=200, content={"status": "skipped"})
+            else:
                 logger.info(f"File received: {file}")
                 file_url = file.get('url_private')
                 token = os.getenv("SLACK_BOT_TOKEN")
+
                 try:
+                    # Process the audio file
                     transcribed_text = process_audio_file(file_url, token)
                     if transcribed_text:
                         bot_response = generate_response(transcribed_text)
@@ -480,12 +487,11 @@ async def slack_events(req: Request) -> JSONResponse:
                         send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
                     else:
                         send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
-               
+                
                 except Exception as e:
                     logger.error(f"Failed to process audio file: {str(e)}")
 
     return JSONResponse(status_code=200, content={"status": "success"})
-
 @app.get("/healthz")
 async def healthz() -> dict:
     """
