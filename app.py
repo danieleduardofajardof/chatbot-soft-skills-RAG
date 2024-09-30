@@ -72,19 +72,5 @@ async def slack_events(req: Request) -> JSONResponse:
 
         # Handle text message events
         elif event.get('type') == 'message' and 'subtype' not in event:
-            logger.info("Processing text message")
-            user_input = event.get('text', '').strip()
-            user_id = event.get('user', '')
-            channel = event.get('channel', '')
-
-            # Get the bot's user ID to prevent it from responding to itself
-            auth_response = slack_client.auth_test()
-            bot_user_id = auth_response['user_id']
-
-            if user_input and user_id and channel and user_id != bot_user_id:
-                # Generate a response based on conversation context
-                bot_response = generate_response(user_id, user_input, conversation_state)
-                log_conversation(user_id, user_input, bot_response)
-                await send_response_to_slack(channel, bot_response)
-
+           pass
     return JSONResponse(status_code=200, content={"status": "success"})
