@@ -446,6 +446,13 @@ async def slack_events(req: Request) -> JSONResponse:
         elif 'files' in event:
             logger.info("Files found in the event")
             for file in event.get('files'):
+                user_id = event.get('user', '')
+                auth_response = slack_client.auth_test()
+                bot_user_id = auth_response['user_id']
+                if user_id == bot_user_id:
+                    logger.info("Skipping file event from the bot itself.")
+                    return JSONResponse(status_code=200, content={"status": "skipped"})
+                
                 logger.info(f"File received: {file}")
                 file_url = file.get('url_private')
                 token = os.getenv("SLACK_BOT_TOKEN")
