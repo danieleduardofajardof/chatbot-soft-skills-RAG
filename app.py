@@ -39,12 +39,16 @@ async def slack_events(req: Request) -> JSONResponse:
             file_url = file['url_private']
             token = os.getenv("SLACK_BOT_TOKEN")
             
+            # Log the entire file object for inspection
+            logger.info(f"File object from event: {file}")
+
             # Check if Slack has provided a transcription
             if 'transcription' in file and file['transcription'].get('status') == 'complete':
                 transcribed_text = file['transcription'].get('text')
                 logger.info(f"Using Slack transcription: {transcribed_text}")
             else:
-                logger.info("No transcription available, processing audio manually")
+                # Fallback to manual transcription
+                logger.info("No transcription available or incomplete, processing audio manually")
                 transcribed_text = await process_audio_file(file_url, token)
 
             user_id = event.get('user', '')
