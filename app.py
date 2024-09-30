@@ -337,7 +337,7 @@ def send_response_to_slack(channel: str, response: str, file_path: str = None) -
             if local_audio_file:
                 logger.info(f"Uploading audio response to Slack: {local_audio_file}")
                 with open(local_audio_file, "rb") as audio_file:
-                    slack_client.files_upload(channels=channel, file=audio_file, title="Response Audio")
+                    slack_client.files_upload_v2(channels=channel, file=audio_file, title="Response Audio")
             else:
                 logger.error("Failed to download audio file for Slack upload.")
         else:
