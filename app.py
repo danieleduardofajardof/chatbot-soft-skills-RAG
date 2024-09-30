@@ -76,6 +76,149 @@ openai_client = AzureOpenAI(
     api_version="2023-03-15-preview"
 )
 
+
+def generate_hypothetical_response(user_input: str) -> str:
+    """
+    Generates a hypothetical response using Azure OpenAI GPT-3.5 for the HyDE technique.
+    
+    Parameters:
+    - user_input: str - The input text from the user.
+    
+    Returns:
+    - str: The generated hypothetical document based on the input.
+    """
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-35-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates hypothetical responses to help with query understanding."},
+                {"role": "user", "content": user_input}
+            ],
+            max_tokens=300,
+            n=1,
+            stop=None,
+            temperature=0.7
+        )
+        hypothetical_response = response.choices[0].message.content.strip()
+        logger.info(f"Generated hypothetical response: {hypothetical_response}")
+        return hypothetical_response
+    except Exception as e:
+        logger.error(f"Error generating hypothetical response from Azure OpenAI: {e}")
+        return "Unable to generate a hypothetical response at the moment."
+
+def generate_embeddings(text: str) -> list:
+    """
+    Generates embeddings from a text using OpenAI's embedding API.
+    
+    Parameters:
+    - text: str - The text to embed.
+    
+    Returns:
+    - list: A list of embeddings (vectors) representing the text.
+    """
+    try:
+        embeddings = openai_client.embeddings.create(
+            model="text-embedding-ada-002",
+            input=text
+        )
+        embedding_vector = embeddings['data'][0]['embedding']
+        logger.info(f"Generated embeddings for text")
+        return embedding_vector
+    except Exception as e:
+        logger.error(f"Error generating embeddings: {e}")
+        return None
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """
+    Calculates the cosine similarity between two vectors.
+    
+    Parameters:
+    - a: np.ndarray - The first vector.
+    - b: np.ndarray - The second vector.
+    
+    Returns:
+    - float: The cosine similarity score.
+    """
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+def search_cosmosdb(embedding: list) -> dict:
+    """
+    Searches for the closest document in CosmosDB based on the embedding similarity.
+    
+    Parameters:
+    - embedding: list - The embedding of the hypothetical document.
+    
+    Returns:
+    - dict: The closest matching document from CosmosDB.
+    """
+    try:
+        # Convert the embedding to a numpy array
+        query_embedding = np.array(embedding)
+
+        # Fetch all documents and embeddings from CosmosDB (This assumes your documents have embeddings stored)
+        documents = documents_collection.find()
+        closest_document = None
+        highest_similarity = -1
+
+        # Iterate through each document and compute similarity
+        for document in documents:
+            document_embedding = np.array(document.get('embedding', []))  # Get stored embedding
+            similarity = cosine_similarity(query_embedding, document_embedding)
+
+            if similarity > highest_similarity:
+                highest_similarity = similarity
+                closest_document = document
+        
+        if closest_document:
+            logger.info(f"Found the closest document with similarity: {highest_similarity}")
+            return closest_document
+        else:
+            logger.info("No matching document found")
+            return {"error": "No matching document found"}
+    except Exception as e:
+        logger.error(f"Error searching CosmosDB: {e}")
+        return {"error": "An error occurred while searching for documents"}
+
+def process_with_hyde(user_input: str) -> str:
+    """
+    Implements HyDE technique: generates a hypothetical document, embeds it, and searches CosmosDB.
+    
+    Parameters:
+    - user_input: str - The input query from the user.
+    
+    Returns:
+    - str: The response after applying the HyDE technique with CosmosDB search.
+    """
+    # Step 1: Generate a hypothetical document
+    hypothetical_doc = generate_hypothetical_response(user_input)
+    
+    # Step 2: Generate embeddings for the hypothetical document
+    embedding = generate_embeddings(hypothetical_doc)
+    
+    if embedding:
+        # Step 3: Search CosmosDB for the most similar document
+        closest_document = search_cosmosdb(embedding)
+        if "error" in closest_document:
+            return "Sorry, no relevant document found."
+        else:
+            return closest_document.get('content', 'Sorry, no relevant document found.')
+    else:
+        return "Unable to process the request using HyDE at the moment."
+
+# --- End of HyDE Implementation ---
+
+def generate_response(user_input: str) -> str:
+    """
+    Generates a chatbot response using the HyDE technique and CosmosDB search.
+    
+    Parameters:
+    - user_input: str - The input text from the user.
+    
+    Returns:
+    - str: The generated response or an error message if generation fails.
+    """
+    return process_with_hyde(user_input)
+
 # Initialize FastAPI app
 app = FastAPI()
 
@@ -274,17 +417,30 @@ def process_audio_file(file_url: str, token: str) -> str:
         logger.error(f"Failed to process audio file: {str(e)}")
         return None
 
-
 def generate_response(user_input: str) -> str:
     """
-    Generates a chatbot response using Azure OpenAI GPT-3.5.
+    Generates a chatbot response using HyDE first, and falls back to the original GPT-3.5 logic if HyDE fails.
     
     Parameters:
     - user_input: str - The input text from the user.
     
     Returns:
-    - str: The generated response or an error message if generation fails.
+    - str: The generated response from HyDE or GPT-3.5, or an error message if both fail.
     """
+    try:
+        # Try the HyDE process first
+        hyde_response = process_with_hyde(user_input)
+        if hyde_response:
+            logger.info(f"HyDE process successful, returning response: {hyde_response}")
+            return hyde_response
+        else:
+            logger.warning("HyDE process did not return a valid result, falling back to GPT-3.5")
+
+    except Exception as e:
+        logger.error(f"Error during HyDE process: {e}")
+        logger.warning("Falling back to GPT-3.5")
+
+    # Fallback to original GPT-3.5 response generation
     try:
         response = openai_client.chat.completions.create(
             model="gpt-35-turbo",  # Ensure this matches the deployment name in Azure for GPT-3.5
@@ -298,10 +454,11 @@ def generate_response(user_input: str) -> str:
             temperature=0.7
         )
         bot_response = response.choices[0].message.content.strip()
-        logger.info(f"Generated bot response: {bot_response}")
+        logger.info(f"Generated bot response using GPT-3.5: {bot_response}")
         return bot_response
+
     except Exception as e:
-        logger.error(f"Error generating response from Azure OpenAI: {e}")
+        logger.error(f"Error generating response from GPT-3.5: {e}")
         return "I'm sorry, I'm having trouble generating a response right now."
 
 def send_response_to_slack(channel: str, response: str, file_path: str = None) -> None:

@@ -14,13 +14,14 @@ The AI-Powered Soft Skills Coach Chatbot is designed to assist users in developi
 ## Technology Stack
 
 - **Backend Framework**: FastAPI
-- **Machine Learning Framework**: Transformers (Hugging Face)
+- **Machine Learning Framework**: Azure Open AI 
 - **Database**: Azure Cosmos DB (MongoDB API)
 - **Containerization**: Docker
 - **Orchestration**: Azure Kubernetes Service (AKS)
 - **Speech Services**: Azure Cognitive Services for Speech
 - **Messaging Platform**: Slack API
 - **Programming Language**: Python
+- **CI/CD**: Github Actions
 
 ## Setup Instructions
 
