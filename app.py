@@ -394,13 +394,27 @@ def generate_response_with_rag(user_input: str) -> str:
         logger.error(f"Error generating response from Azure OpenAI: {e}")
         return "I'm sorry, I'm having trouble generating a response right now."
 
-def retrieve_documents(query: str) -> str:
-    # Query your MongoDB for relevant documents
-    documents = db['knowledge_base'].find({"$text": {"$search": query}})
-    if documents:
-        # Concatenate relevant text from documents
-        return " ".join([doc['content'] for doc in documents])
-    return ""
+def retrieve_documents(user_input: str):
+    """
+    Retrieves documents from MongoDB that match the user input using a regular expression search.
+    
+    Parameters:
+    - user_input: str - The input to search for within the document content.
+    
+    Returns:
+    - str: The concatenated content of the matched documents.
+    """
+    try:
+        query = {"content": {"$regex": user_input, "$options": "i"}}  # Case-insensitive regex search
+        documents = logs_collection.find(query)
+
+        if documents:
+            return " ".join([doc['content'] for doc in documents])
+        else:
+            return "No relevant documents found."
+    except Exception as e:
+        logger.error(f"Error retrieving documents: {str(e)}")
+        return "An error occurred while retrieving documents."
 
 
 @app.post('/slack/events')
