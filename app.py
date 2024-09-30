@@ -40,7 +40,7 @@ class CosmosDBHandler(logging.Handler):
         logs_collection.insert_one(log_entry)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.addHandler(CosmosDBHandler())  # Add custom handler to store logs in CosmosDB
 
@@ -544,26 +544,25 @@ async def slack_events(req: Request) -> JSONResponse:
                 bot_response = generate_response(user_input)
                 log_conversation(user_id, user_input, bot_response)
                 send_response_to_slack(channel, bot_response)
-        else:
+        elif('files' in event.keys()):
             print("Files found in the event")
             logger.info("Files found in the event")
-            for file in event.get('files'):
-                logger.info(f"File received: {file}")
-                file_url = file.get('url_private')
-                token = os.getenv("SLACK_BOT_TOKEN")
-                try:
-                    transcribed_text = process_audio_file(file_url, token)
-                    if transcribed_text:
-                        bot_response = generate_response(transcribed_text)
-                        # Convert bot response to audio
-                        audio_file_path = text_to_speech(bot_response)
-                        logger.info(f"Generated audio file path: {audio_file_path}")
-                        send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
-                    else:
-                        send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
-               
-                except Exception as e:
-                    logger.error(f"Failed to process audio file: {str(e)}")
+            logger.info(f"File received: {event['files']['name']}")
+            file_url = event['files']['url_private']
+            token = os.getenv("SLACK_BOT_TOKEN")
+            try:
+                transcribed_text = process_audio_file(file_url, token)
+                if transcribed_text:
+                    bot_response = generate_response(transcribed_text)
+                    # Convert bot response to audio
+                    audio_file_path = text_to_speech(bot_response)
+                    logger.info(f"Generated audio file path: {audio_file_path}")
+                    send_response_to_slack(event.get('channel'), bot_response, audio_file_path)
+                else:
+                    send_response_to_slack(event.get('channel'), "Sorry, I couldn't understand the audio.")
+            
+            except Exception as e:
+                logger.error(f"Failed to process audio file: {str(e)}")
 
     return JSONResponse(status_code=200, content={"status": "success"})
 
