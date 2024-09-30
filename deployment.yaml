@@ -18,9 +18,11 @@ spec:
         fsGroup: 0              # File system group for the pod
         seccompProfile:
           type: RuntimeDefault 
-      containers:
-      - name: soft-skills-chatbot
-        image: softskillsregistry.azurecr.io/softskillsbot:latest
+    containers:
+      - name: soft-skills-bot
+        image: softskillsregistry.azurecr.io/softskillsbot:__IMAGE_TAG__
+        imagePullPolicy: Always
+
         ports:
         - containerPort: 80
         env:
