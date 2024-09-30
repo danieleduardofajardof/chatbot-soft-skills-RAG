@@ -13,16 +13,15 @@ spec:
         app: soft-skills-chatbot
     spec:
       securityContext:
-        runAsUser: 0            # Run all containers as this user
+        runAsUser: 0            # Run all containers as this user (root in this case)
         runAsGroup: 0           # Run all containers in this group
         fsGroup: 0              # File system group for the pod
         seccompProfile:
-          type: RuntimeDefault 
-    containers:
+          type: RuntimeDefault   # Security profile
+      containers:                # Here is the corrected containers section
       - name: soft-skills-bot
         image: softskillsregistry.azurecr.io/softskillsbot:__IMAGE_TAG__
         imagePullPolicy: Always
-
         ports:
         - containerPort: 80
         env:
@@ -50,7 +49,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: softskills-secrets
-              key: AZURE_REGION     
+              key: AZURE_REGION
         - name: AZURE_STORAGE_CONNECTION_STRING
           valueFrom:
             secretKeyRef:
