@@ -167,3 +167,18 @@ async def generate_response(user_id: str, user_input: str, conversation_state: d
         conversation_state[user_id] = {"last_question": "ask_for_name"}
 
     return bot_response
+
+async def get_file_info_from_slack(file_id: str, token: str) -> dict:
+    url = f"https://slack.com/api/files.info?file={file_id}"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as response:
+            if response.status == 200:
+                file_info = await response.json()
+                logger.info(f"Retrieved file info: {file_info}")
+                return file_info.get('file', {})
+            else:
+                logger.error(f"Failed to retrieve file info from Slack. Status code: {response.status}")
+                return {}
