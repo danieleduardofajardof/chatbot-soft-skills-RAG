@@ -304,7 +304,7 @@ def generate_response(user_input: str) -> str:
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": user_input}
             ],
-            max_tokens=150,
+            max_tokens=500,
             n=1,
             stop=None,
             temperature=0.7
@@ -498,7 +498,7 @@ def generate_hypothetical_answer(user_id: str, user_input: str) -> str:
                 {"role": "system", "content": "You are a knowledgeable assistant."},
                 {"role": "user", "content": full_prompt}
             ],
-            max_tokens=150,
+            max_tokens=500,
             n=1,
             stop=None,
             temperature=0.7
