@@ -468,6 +468,8 @@ def update_user_session(user_id: str, user_message: str, bot_response: str) -> N
         logger.info(f"Session updated for user {user_id}.")
     except Exception as e:
         logger.error(f"Error updating session for user {user_id}: {str(e)}")
+
+
 def generate_hypothetical_answer(user_id: str, user_input: str) -> str:
     """
     Generates a hypothetical answer using Azure OpenAI GPT-3.5 based on user input and conversation history.
