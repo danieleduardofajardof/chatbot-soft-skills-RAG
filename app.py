@@ -416,14 +416,46 @@ def retrieve_documents(user_input: str):
         logger.error(f"Error retrieving documents: {str(e)}")
         return "An error occurred while retrieving documents."
 
+def is_event_processed(event_id: str) -> bool:
+    """
+    Check if the event with the given event_id has already been processed.
+
+    Parameters:
+    - event_id: str - The ID of the event to check.
+
+    Returns:
+    - bool: True if the event has been processed, False otherwise.
+    """
+    try:
+        existing_event = db['processed_events'].find_one({"event_id": event_id})
+        return existing_event is not None
+    except Exception as e:
+        logger.error(f"Error checking if event {event_id} is processed: {str(e)}")
+        return False
+
+def mark_event_as_processed(event_id: str) -> None:
+    """
+    Mark the event as processed by inserting the event_id into CosmosDB.
+
+    Parameters:
+    - event_id: str - The ID of the event to mark as processed.
+
+    Returns:
+    - None
+    """
+    try:
+        db['processed_events'].insert_one({"event_id": event_id, "processed_at": datetime.utcnow()})
+        logger.info(f"Event {event_id} marked as processed.")
+    except Exception as e:
+        logger.error(f"Error marking event {event_id} as processed: {str(e)}")
 
 # Initialize a set to keep track of processed events
 processed_event_ids = set()
-
 @app.post('/slack/events')
 async def slack_events(req: Request) -> JSONResponse:
     """
     Slack event handler to process events such as messages or file shares.
+
     Parameters:
     - req: Request - The incoming request object from Slack containing the event data.
     
@@ -433,6 +465,7 @@ async def slack_events(req: Request) -> JSONResponse:
     data = await req.json()
     logger.info(f"Received event: {data}")
 
+    # Slack verification
     if data.get("type") == "url_verification":
         challenge = data.get("challenge")
         return JSONResponse(status_code=200, content={"challenge": challenge})
@@ -441,13 +474,13 @@ async def slack_events(req: Request) -> JSONResponse:
         event = data['event']
         event_id = data.get('event_id')
 
-        # Deduplication: Skip if event has already been processed
-        if event_id in processed_event_ids:
+        # Check if the event has already been processed in CosmosDB
+        if is_event_processed(event_id):
             logger.info(f"Event {event_id} already processed, skipping.")
             return JSONResponse(status_code=200, content={"status": "skipped"})
         
-        # Add event to the processed set to avoid reprocessing
-        processed_event_ids.add(event_id)
+        # Add event to CosmosDB to track it as processed
+        mark_event_as_processed(event_id)
 
         # Handle text message events
         if event.get('type') == 'message' and 'subtype' not in event:
@@ -500,6 +533,7 @@ async def slack_events(req: Request) -> JSONResponse:
                     logger.error(f"Failed to process audio file: {str(e)}")
 
     return JSONResponse(status_code=200, content={"status": "success"})
+
 
 @app.get("/healthz")
 async def healthz() -> dict:
