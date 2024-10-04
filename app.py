@@ -14,6 +14,7 @@ from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from pydub import AudioSegment
 import io
 
+
 # Custom logging handler to store logs in CosmosDB
 class CosmosDBHandler(logging.Handler):
     """Custom logging handler that stores logs in a MongoDB collection."""
