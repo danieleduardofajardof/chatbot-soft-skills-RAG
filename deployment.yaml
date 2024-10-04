@@ -65,8 +65,3 @@ spec:
             secretKeyRef:
               name: softskills-secrets
               key: AZURE_SPEECH_API_KEY
-        - name: AZURE_REGION
-          valueFrom:
-            secretKeyRef:
-              name: softskills-secrets
-              key: AZURE_REGION
